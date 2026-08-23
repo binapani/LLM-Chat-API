@@ -12,17 +12,20 @@ public class ChatController : ControllerBase
     private readonly IEmbeddingService _embeddingService;
     private readonly IDocumentIngestionService _documentIngestionService;
     private readonly IVectorStore _vectorStore;
+    private readonly IRAGService _ragService;
 
     public ChatController(
         ILLMService llmService,
         IEmbeddingService embeddingService,
         IDocumentIngestionService documentIngestionService,
-        IVectorStore vectorStore)
+        IVectorStore vectorStore,
+        IRAGService ragService)
     {
         _llmService = llmService;
         _embeddingService = embeddingService;
         _documentIngestionService = documentIngestionService;
         _vectorStore = vectorStore;
+        _ragService = ragService;
     }
 
     [HttpPost]
@@ -70,5 +73,21 @@ public class ChatController : ControllerBase
         var results = await _vectorStore.SearchAsync(queryEmbedding, 2);
 
         return Ok(results);
+    }
+
+    [HttpPost("rag")]
+    public async Task<ActionResult<ChatResponse>> GenerateRagAnswer([FromBody] ChatRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var answer = await _ragService.GenerateAnswerAsync(request.Message);
+
+        return Ok(new ChatResponse
+        {
+            Answer = answer
+        });
     }
 }

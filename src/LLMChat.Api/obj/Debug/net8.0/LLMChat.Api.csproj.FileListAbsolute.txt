@@ -1,6 +1,5 @@
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\appsettings.Development.json
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\appsettings.json
-C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\LLMChat.Api.exe
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\LLMChat.Api.deps.json
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\LLMChat.Api.runtimeconfig.json
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\LLMChat.Api.dll
@@ -32,3 +31,4 @@ C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\obj\Debug\net
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\obj\Debug\net8.0\LLMChat.Api.genruntimeconfig.cache
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\obj\Debug\net8.0\ref\LLMChat.Api.dll
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\obj\Debug\net8.0\LLMChat.Api.sourcelink.json
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\LLMChat.Api.exe
