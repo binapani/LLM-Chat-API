@@ -1,0 +1,56 @@
+using LLMChat.Api.Models;
+
+namespace LLMChat.Api.Services;
+
+public class InMemoryVectorStore : IVectorStore
+{
+    private readonly List<DocumentVector> _documents = new();
+
+    public Task AddAsync(DocumentVector document)
+    {
+        _documents.Add(document);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<DocumentVector>> SearchAsync(float[] queryEmbedding, int topK)
+    {
+        var results = _documents
+            .Select(document => new
+            {
+                Document = document,
+                Similarity = CalculateCosineSimilarity(queryEmbedding, document.Embedding)
+            })
+            .OrderByDescending(result => result.Similarity)
+            .Take(topK)
+            .Select(result => result.Document)
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<DocumentVector>>(results);
+    }
+
+    private static float CalculateCosineSimilarity(float[] first, float[] second)
+    {
+        if (first.Length == 0 || second.Length == 0 || first.Length != second.Length)
+        {
+            return 0;
+        }
+
+        float dotProduct = 0;
+        float firstMagnitude = 0;
+        float secondMagnitude = 0;
+
+        for (var index = 0; index < first.Length; index++)
+        {
+            dotProduct += first[index] * second[index];
+            firstMagnitude += first[index] * first[index];
+            secondMagnitude += second[index] * second[index];
+        }
+
+        if (firstMagnitude == 0 || secondMagnitude == 0)
+        {
+            return 0;
+        }
+
+        return dotProduct / (MathF.Sqrt(firstMagnitude) * MathF.Sqrt(secondMagnitude));
+    }
+}

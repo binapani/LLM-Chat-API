@@ -12,7 +12,9 @@ builder.Services.AddHttpClient<ILLMService, LLMService>(client =>
 {
     client.Timeout = TimeSpan.FromMinutes(3);
 });
-
+builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>();
+builder.Services.AddSingleton<IVectorStore, InMemoryVectorStore>(); 
+builder.Services.AddScoped<IDocumentIngestionService, DocumentIngestionService>();
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
