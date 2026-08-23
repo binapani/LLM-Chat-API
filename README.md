@@ -1,129 +1,193 @@
 # LLM Chat API
 
-A .NET 8 Web API built for modern large language model (LLM) applications using clean architecture, dependency injection, secure configuration, and Azure-first deployment.
+A focused .NET 8 ASP.NET Core Web API for learning how local large language models, embeddings, semantic search, and Retrieval-Augmented Generation (RAG) fit together.
 
-This project is designed to support conversational AI, prompt-driven workflows, document-aware retrieval, and agent-style orchestration with production-ready concerns such as logging, error handling, and configuration management.
+The API uses [Ollama](https://ollama.com/) locally:
 
-## Features
+- `qwen2.5:3b` generates text responses.
+- `nomic-embed-text` generates embeddings.
+- Prompt engineering gives the text model a consistent audience and response focus.
+- An in-memory vector store ranks documents using cosine similarity.
 
-- .NET 8 Web API
-- Clean architecture
-- Dependency Injection
-- Configuration & secrets management
-- LLM integration
-- Prompt management
-- Error handling
-- Logging
-- Conversation history
-- Embeddings
-- Vector search
-- RAG (Retrieval-Augmented Generation)
-- Tool calling
-- AI agent orchestration
-- Azure deployment
+## Completed Features
 
-## Architecture Overview
+### Text generation and prompt engineering
 
-The solution is organized around a clean separation of concerns:
+`LLMService` sends requests to Ollama's `/api/generate` endpoint through an injected `HttpClient`. Each prompt includes a system instruction for experienced software engineers, followed by the user's message. Responses are returned through the `ChatResponse` model.
 
-- API layer for HTTP endpoints and controllers
-- Application layer for orchestration, business logic, and use cases
-- Domain layer for core entities, contracts, and shared models
-- Infrastructure layer for LLM providers, storage, vector search, and external integrations
-- Shared configuration and security components
+### Embeddings
 
-## Core Capabilities
+`IEmbeddingService` defines the embedding contract, and `EmbeddingService` calls Ollama's `/api/embeddings` endpoint with the `nomic-embed-text` model. The generated vector is returned as `float[]`.
 
-### 1. LLM Integration
-Connect to model providers and orchestrate requests for chat, summarization, classification, tool execution, and retrieval tasks.
+### In-memory semantic search
 
-### 2. Prompt Management
-Centralize prompt templates, versioning, and system/user message composition for reliable and maintainable AI workflows.
+`IVectorStore` defines document storage and search operations. `InMemoryVectorStore` stores `DocumentVector` objects in memory and calculates cosine similarity between a query embedding and each stored embedding. Results are ordered by descending similarity.
 
-### 3. Conversation History
-Track chat sessions and previous messages to enable context-aware conversations and multi-turn interactions.
+### Document ingestion
 
-### 4. Embeddings and Vector Search
-Generate embeddings for text and use vector search to find the most relevant context for RAG-based responses.
+`DocumentIngestionService` uses `IEmbeddingService` to embed each document and then stores the resulting `DocumentVector` through `IVectorStore`.
 
-### 5. RAG Pipeline
-Combine retrieval with generative responses to ground answers in domain-specific knowledge and supporting documents.
+### End-to-end RAG
 
-### 6. Tool Calling and AI Agents
-Support structured tool execution and multi-step AI agent flows where the model can decide to call functions or services.
+`RAGService` coordinates the complete pipeline:
 
-### 7. Production Readiness
-Include robust error handling, structured logging, secure configuration, and Azure deployment patterns.
+```text
+Question -> Embedding -> Vector Search -> Retrieved Context -> Qwen -> Answer
+```
 
-## Suggested Project Structure
+It retrieves the top two matching documents, includes their content in a prompt with the question, and sends that prompt to `ILLMService`. When no documents are available, it returns `No relevant information was found.`
+
+## API Endpoints
+
+The default HTTP development URL is `http://localhost:5166`. Swagger is available at `/swagger` when running in the Development environment.
+
+### `POST /api/chat`
+
+Generate a direct answer from Qwen.
+
+Request:
+
+```json
+{
+	"message": "Explain dependency injection in ASP.NET Core."
+}
+```
+
+### `POST /api/chat/embedding`
+
+Generate an embedding for a plain string request body.
+
+```json
+"Explain dependency injection in ASP.NET Core."
+```
+
+### `POST /api/chat/ingest`
+
+Ingests three built-in sample documents covering password reset, annual leave, and cafeteria opening hours. This endpoint does not require a request body.
+
+### `POST /api/chat/search`
+
+Embeds the question and returns the two most similar stored `DocumentVector` results.
+
+Request:
+
+```json
+{
+	"message": "When is the cafeteria open?"
+}
+```
+
+### `POST /api/chat/rag`
+
+Runs the complete RAG pipeline and returns a `ChatResponse`.
+
+Request:
+
+```json
+{
+	"message": "How do I reset my password?"
+}
+```
+
+The in-memory store starts empty each time the API process starts. Call `/api/chat/ingest` before using `/api/chat/search` or `/api/chat/rag` with the sample data.
+
+## Project Structure
 
 ```text
 LLM-Chat-API/
-├── src/
-│   ├── LLMChat.Api/
-│   ├── LLMChat.Application/
-│   ├── LLMChat.Domain/
-│   ├── LLMChat.Infrastructure/
-│   └── LLMChat.Shared/
-├── tests/
-│   ├── LLMChat.Api.Tests/
-│   ├── LLMChat.Application.Tests/
-│   └── LLMChat.Infrastructure.Tests/
-├── appsettings.json
-├── appsettings.Development.json
-├── appsettings.Production.json
-├── .env.example
-├── Dockerfile
-├── docker-compose.yml
 ├── README.md
-├── .gitignore
-└── LLMChat.sln
+└── src/
+		└── LLMChat.Api/
+				├── Controllers/
+				│   └── ChatController.cs
+				├── Models/
+				│   ├── ChatRequest.cs
+				│   ├── ChatResponse.cs
+				│   ├── DocumentVector.cs
+				│   ├── OllamaEmbeddingRequest.cs
+				│   ├── OllamaEmbeddingResponse.cs
+				│   ├── OllamaRequest.cs
+				│   └── OllamaResponse.cs
+				├── Services/
+				│   ├── DocumentIngestionService.cs
+				│   ├── EmbeddingService.cs
+				│   ├── IEmbeddingService.cs
+				│   ├── IDocumentIngestionService.cs
+				│   ├── ILLMService.cs
+				│   ├── IRAGService.cs
+				│   ├── IVectorStore.cs
+				│   ├── InMemoryVectorStore.cs
+				│   ├── LLMService.cs
+				│   └── RAGService.cs
+				├── Program.cs
+				└── LLMChat.Api.csproj
 ```
 
-## Configuration and Secrets
+## Local Setup
 
-Use environment variables or managed secret stores for sensitive settings such as:
+### Prerequisites
 
-- Azure OpenAI endpoint and keys
-- API keys for model providers
-- Database and storage connection strings
-- Vector store configuration
-- Authentication and authorization settings
+- .NET 8 SDK
+- Ollama
 
-Best practice is to keep secrets out of source control and load them via configuration providers or Azure Key Vault.
+### 1. Install and start Ollama
 
-## Azure Deployment
-
-The API is intended to be deployable to Azure using services such as:
-
-- Azure App Service
-- Azure Container Apps
-- Azure Kubernetes Service (AKS)
-- Azure OpenAI
-- Azure AI Search
-- Azure Key Vault
-- Azure Application Insights
-
-## Getting Started
-
-1. Install the .NET 8 SDK.
-2. Restore dependencies.
-3. Configure your app settings and secrets.
-4. Run the API locally.
-5. Test endpoints and validate model integrations.
-
-Example commands:
+Install Ollama for your operating system, then make sure the Ollama service is running. Pull the models used by this project:
 
 ```bash
-dotnet restore
-dotnet build
-dotnet run --project src/LLMChat.Api
+ollama pull qwen2.5:3b
+ollama pull nomic-embed-text
 ```
 
-## License
+Ollama should be reachable at `http://localhost:11434`.
 
-This project is intended for learning, experimentation, and production extension. Add an appropriate license before deployment or distribution.
+### 2. Verify Ollama
 
-## Notes
+Text generation:
 
-This README reflects the intended architecture and feature set for the LLM chat API. As the solution evolves, update the documentation to match the concrete implementation and deployment configuration.
+```bash
+curl http://localhost:11434/api/generate -d '{
+	"model": "qwen2.5:3b",
+	"prompt": "Explain RAG in one sentence.",
+	"stream": false
+}'
+```
+
+Embeddings:
+
+```bash
+curl http://localhost:11434/api/embeddings -d '{
+	"model": "nomic-embed-text",
+	"prompt": "Explain RAG in one sentence."
+}'
+```
+
+### 3. Run the API
+
+From the repository root:
+
+```bash
+dotnet restore src/LLMChat.Api/LLMChat.Api.csproj
+dotnet run --project src/LLMChat.Api/LLMChat.Api.csproj
+```
+
+Then open `http://localhost:5166/swagger` or call the endpoints directly.
+
+## Future Roadmap
+
+The following capabilities are planned learning milestones and are not implemented in the current project:
+
+- SQLite persistence for documents and vectors
+- Document chunking
+- Metadata filtering
+- Source citations in generated answers
+- Retrieval and answer evaluation
+- Streaming responses
+- Tool and function calling
+- AI agent orchestration
+- Azure OpenAI integration
+- Azure AI Search integration
+
+## Scope
+
+This project intentionally keeps the current implementation small and local. It is a learning and portfolio project focused on understanding the mechanics of an Ollama-backed RAG API before introducing durable storage, production-scale retrieval, and hosted model services.
