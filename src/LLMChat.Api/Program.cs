@@ -8,8 +8,7 @@ builder.Services.AddControllers();
 // Register Swagger generation
 builder.Services.AddSwaggerGen();
 
-// Register our LLM service
-builder.Services.AddScoped<ILLMService, LLMService>();
+builder.Services.AddHttpClient<ILLMService, LLMService>();
 
 var app = builder.Build();
 
