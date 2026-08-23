@@ -15,6 +15,7 @@ builder.Services.AddHttpClient<ILLMService, LLMService>(client =>
 builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>();
 builder.Services.AddSingleton<IVectorStore, InMemoryVectorStore>(); 
 builder.Services.AddScoped<IDocumentIngestionService, DocumentIngestionService>();
+builder.Services.AddSingleton<IDocumentChunker, DocumentChunker>();
 builder.Services.AddScoped<IRAGService, RAGService>();
 var app = builder.Build();
 
