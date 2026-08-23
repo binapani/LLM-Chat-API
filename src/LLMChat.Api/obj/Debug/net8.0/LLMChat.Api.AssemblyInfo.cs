@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LLMChat.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5df986997c89baca289f2f03cb28ea9c7aaa6d52")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+610a4174318646cbad777e8c7dad586ddc12da12")]
 [assembly: System.Reflection.AssemblyProductAttribute("LLMChat.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LLMChat.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

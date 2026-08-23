@@ -1,4 +1,6 @@
+using LLMChat.Api.Data;
 using LLMChat.Api.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,12 +10,15 @@ builder.Services.AddControllers();
 // Register Swagger generation
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddDbContext<VectorDbContext>(options =>
+    options.UseSqlite("Data Source=vectors.db"));
+
 builder.Services.AddHttpClient<ILLMService, LLMService>(client =>
 {
     client.Timeout = TimeSpan.FromMinutes(3);
 });
 builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>();
-builder.Services.AddSingleton<IVectorStore, InMemoryVectorStore>(); 
+builder.Services.AddScoped<IVectorStore, SQLiteVectorStore>();
 builder.Services.AddScoped<IDocumentIngestionService, DocumentIngestionService>();
 builder.Services.AddSingleton<IDocumentChunker, DocumentChunker>();
 builder.Services.AddScoped<IRAGService, RAGService>();
