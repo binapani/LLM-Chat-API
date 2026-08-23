@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "eidF4Hl1i5IF3Twb4eeWiD4jrkSxZxCMmxBkBxkTzf4=",
+  "Source": "LLMChat.Api",
+  "BasePath": "_content/LLMChat.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
