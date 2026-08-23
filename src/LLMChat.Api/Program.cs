@@ -8,7 +8,10 @@ builder.Services.AddControllers();
 // Register Swagger generation
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddHttpClient<ILLMService, LLMService>();
+builder.Services.AddHttpClient<ILLMService, LLMService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
 
 var app = builder.Build();
 
