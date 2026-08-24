@@ -662,6 +662,150 @@ Next planned milestone:
 - Document metadata management
 - Better document lifecycle management
 
+## Multi-Format Document Ingestion
+
+The document ingestion pipeline now supports multiple real-world document formats through a format-aware extractor architecture.
+
+### Supported Formats
+
+- `.txt`
+- `.md`
+- `.csv`
+- `.pdf`
+- `.docx`
+
+### Architecture
+
+```text
+File Upload
+    ↓
+DocumentsController
+    ↓
+DocumentTextExtractorResolver
+    ↓
+┌───────────────────────────────┐
+│ PlainTextDocumentExtractor    │ → .txt / .md / .csv
+│ PdfDocumentTextExtractor      │ → .pdf
+│ DocxDocumentTextExtractor     │ → .docx
+└───────────────────────────────┘
+    ↓
+DocumentIngestionService
+    ↓
+DocumentChunker
+    ↓
+Embedding Service
+    ↓
+Vector Store
+    ↓
+Hybrid Reranker
+    ↓
+RAG
+    ↓
+Grounded LLM Answer
+```
+
+### Extractor Abstraction
+
+The system uses:
+
+`IDocumentTextExtractor`
+
+This keeps document-format-specific extraction separate from the upload controller and ingestion pipeline.
+
+A `DocumentTextExtractorResolver` selects the appropriate extractor based on the uploaded file extension.
+
+Current implementations:
+
+- `PlainTextDocumentExtractor`
+- `PdfDocumentTextExtractor`
+- `DocxDocumentTextExtractor`
+
+### PDF Support
+
+PDF text extraction is implemented using PdfPig.
+
+The PDF extractor:
+- Reads text from PDF pages.
+- Preserves page order.
+- Produces plain text suitable for chunking and embedding.
+- Does not require Microsoft Word or another desktop application.
+
+### DOCX Support
+
+DOCX extraction is implemented using the Microsoft Open XML SDK.
+
+The DOCX extractor:
+- Reads DOCX documents directly from streams.
+- Does not require Microsoft Word to be installed.
+- Extracts paragraph/run text.
+- Extracts table-cell content.
+- Converts the document into plain text suitable for RAG chunking.
+
+### End-to-End Validation
+
+The same annual-leave test document was successfully processed through:
+
+1. TXT upload and RAG retrieval.
+2. PDF upload and RAG retrieval.
+3. DOCX upload and RAG retrieval.
+
+The DOCX test successfully returned:
+
+"Full-time employees receive twenty days of annual leave per year."
+
+This confirms that different document formats can enter the same downstream ingestion and RAG pipeline.
+
+### Architectural Benefit
+
+The controller does not contain format-specific extraction logic.
+
+Instead:
+
+```text
+File extension
+    ↓
+DocumentTextExtractorResolver
+    ↓
+Format-specific extractor
+    ↓
+Common ingestion pipeline
+```
+
+This makes adding another format, such as a future document type, possible without redesigning the upload or RAG pipeline.
+
+### Current Status
+
+Completed:
+
+- File upload API
+- Extractor abstraction
+- Format-aware extractor resolver
+- TXT/MD/CSV extraction
+- PDF extraction
+- DOCX extraction
+- Document ingestion
+- Chunking
+- Embedding
+- Vector storage
+- Hybrid reranking
+- RAG retrieval
+- End-to-end multi-format testing
+
+### Next Milestone
+
+Document Management & Metadata:
+
+- DocumentId
+- FileName
+- ContentType
+- UploadedAt
+- Source
+- Version
+- Document listing
+- Document deletion
+- Re-indexing
+- Duplicate detection
+
 ## Future Roadmap
 
 The following capabilities are planned learning milestones and are not implemented as production-grade architecture in the current codebase:

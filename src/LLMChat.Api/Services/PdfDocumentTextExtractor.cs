@@ -1,3 +1,4 @@
+using System.Text;
 using UglyToad.PdfPig;
 
 namespace LLMChat.Api.Services;
@@ -29,7 +30,7 @@ public class PdfDocumentTextExtractor : IDocumentTextExtractor
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            using var pdfDocument = PdfDocument.Open(fileStream);
+            using var pdfDocument = PdfDocument.Open(fileStream, leaveStreamOpen: true);
             var pageTexts = new List<string>();
 
             foreach (var page in pdfDocument.GetPages())
