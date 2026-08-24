@@ -127,3 +127,13 @@ C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\runtimes\win-arm64\native\e_sqlite3.dll
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\runtimes\win-x64\native\e_sqlite3.dll
 C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\runtimes\win-x86\native\e_sqlite3.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\UglyToad.PdfPig.Core.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\UglyToad.PdfPig.DocumentLayoutAnalysis.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\UglyToad.PdfPig.Fonts.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\UglyToad.PdfPig.Package.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\UglyToad.PdfPig.Tokenization.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\UglyToad.PdfPig.Tokens.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\UglyToad.PdfPig.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\DocumentFormat.OpenXml.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\DocumentFormat.OpenXml.Framework.dll
+C:\Users\pc\OneDrive\Documents\GitHub\LLM-Chat-API\src\LLMChat.Api\bin\Debug\net8.0\System.IO.Packaging.dll

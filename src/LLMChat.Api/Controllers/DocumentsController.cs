@@ -7,14 +7,14 @@ namespace LLMChat.Api.Controllers;
 [Route("api/[controller]")]
 public class DocumentsController : ControllerBase
 {
-    private readonly IDocumentTextExtractor _documentTextExtractor;
+    private readonly IDocumentTextExtractorResolver _documentTextExtractorResolver;
     private readonly IDocumentIngestionService _documentIngestionService;
 
     public DocumentsController(
-        IDocumentTextExtractor documentTextExtractor,
+        IDocumentTextExtractorResolver documentTextExtractorResolver,
         IDocumentIngestionService documentIngestionService)
     {
-        _documentTextExtractor = documentTextExtractor;
+        _documentTextExtractorResolver = documentTextExtractorResolver;
         _documentIngestionService = documentIngestionService;
     }
 
@@ -33,8 +33,12 @@ public class DocumentsController : ControllerBase
             return BadRequest("File is empty.");
         }
 
+        var extractor = await _documentTextExtractorResolver.ResolveAsync(
+            file.FileName,
+            cancellationToken);
+
         await using var stream = file.OpenReadStream();
-        var extractedText = await _documentTextExtractor.ExtractTextAsync(
+        var extractedText = await extractor.ExtractTextAsync(
             stream,
             file.FileName,
             cancellationToken);

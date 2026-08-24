@@ -25,7 +25,10 @@ builder.Services.AddScoped<IRAGService, RAGService>();
 builder.Services.AddScoped<IRelevanceService, RelevanceService>();
 builder.Services.AddScoped<IReranker, HybridReranker>();
 builder.Services.AddScoped<IRAGEvaluationService, RAGEvaluationService>();
-builder.Services.AddScoped<IDocumentTextExtractor, PlainTextDocumentExtractor>();
+builder.Services.AddScoped<PlainTextDocumentExtractor>();
+builder.Services.AddScoped<PdfDocumentTextExtractor>();
+builder.Services.AddScoped<DocxDocumentTextExtractor>();
+builder.Services.AddScoped<IDocumentTextExtractorResolver, DocumentTextExtractorResolver>();
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
