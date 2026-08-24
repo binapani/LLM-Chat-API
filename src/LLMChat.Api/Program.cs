@@ -24,6 +24,7 @@ builder.Services.AddSingleton<IDocumentChunker, DocumentChunker>();
 builder.Services.AddScoped<IRAGService, RAGService>();
 builder.Services.AddScoped<IRelevanceService, RelevanceService>();
 builder.Services.AddScoped<IReranker, HybridReranker>();
+builder.Services.AddScoped<IRAGEvaluationService, RAGEvaluationService>();
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

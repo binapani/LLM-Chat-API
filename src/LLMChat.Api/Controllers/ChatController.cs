@@ -14,6 +14,7 @@ public class ChatController : ControllerBase
     private readonly IDocumentIngestionService _documentIngestionService;
     private readonly IVectorStore _vectorStore;
     private readonly IRAGService _ragService;
+    private readonly IRAGEvaluationService _ragEvaluationService;
 
     public ChatController(
         IConfiguration configuration,
@@ -21,7 +22,8 @@ public class ChatController : ControllerBase
         IEmbeddingService embeddingService,
         IDocumentIngestionService documentIngestionService,
         IVectorStore vectorStore,
-        IRAGService ragService)
+        IRAGService ragService,
+        IRAGEvaluationService ragEvaluationService)
     {
         _configuration = configuration;
         _llmService = llmService;
@@ -29,6 +31,7 @@ public class ChatController : ControllerBase
         _documentIngestionService = documentIngestionService;
         _vectorStore = vectorStore;
         _ragService = ragService;
+        _ragEvaluationService = ragEvaluationService;
     }
 
     [HttpPost]
@@ -127,5 +130,19 @@ public async Task<IActionResult> IngestDocuments()
         {
             Answer = answer
         });
+    }
+
+    [HttpPost("evaluate-rag")]
+    public async Task<ActionResult<IReadOnlyList<RAGEvaluationResult>>> EvaluateRag(
+        [FromBody] IReadOnlyList<RAGEvaluationCase> cases)
+    {
+        if (cases == null || cases.Count == 0)
+        {
+            return BadRequest("Evaluation cases are required and cannot be empty.");
+        }
+
+        var results = await _ragEvaluationService.EvaluateAsync(cases);
+
+        return Ok(results);
     }
 }
