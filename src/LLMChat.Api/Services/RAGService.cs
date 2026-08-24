@@ -9,6 +9,7 @@ public class RAGService : IRAGService
     private readonly IVectorStore _vectorStore;
     private readonly ILLMService _llmService;
     private readonly IRelevanceService _relevanceService;
+    private readonly IReranker _reranker;
     private readonly IConfiguration _configuration;
     private readonly ILogger<RAGService> _logger;
 
@@ -17,6 +18,7 @@ public class RAGService : IRAGService
         IVectorStore vectorStore,
         ILLMService llmService,
         IRelevanceService relevanceService,
+        IReranker reranker,
         IConfiguration configuration,
         ILogger<RAGService> logger)
     {
@@ -24,6 +26,7 @@ public class RAGService : IRAGService
         _vectorStore = vectorStore;
         _llmService = llmService;
         _relevanceService = relevanceService;
+        _reranker = reranker;
         _configuration = configuration;
         _logger = logger;
     }
@@ -52,7 +55,6 @@ public class RAGService : IRAGService
                 !string.IsNullOrWhiteSpace(candidate.Document.Content) &&
                 candidate.Similarity >= minimumSimilarity)
             .OrderByDescending(candidate => candidate.Similarity)
-            .Take(relevanceTopK)
             .ToList();
 
         var candidatesAfterSimilarityFilter = candidates.Count;
@@ -62,10 +64,11 @@ public class RAGService : IRAGService
             totalStopwatch.Stop();
             var earlyTotalMs = totalStopwatch.ElapsedMilliseconds;
             _logger.LogInformation(
-                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
+                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
                 earlyTotalMs,
                 embeddingMs,
                 vectorSearchMs,
+                0,
                 0,
                 0,
                 retrievalTopK,
@@ -78,8 +81,13 @@ public class RAGService : IRAGService
             return "The information is not available in the provided documents.";
         }
 
+        var rerankingStopwatch = Stopwatch.StartNew();
+        var rerankedCandidates = await _reranker.RerankAsync(question, candidates, relevanceTopK);
+        rerankingStopwatch.Stop();
+        var rerankingMs = rerankingStopwatch.ElapsedMilliseconds;
+
         var relevanceValidationStopwatch = Stopwatch.StartNew();
-        var relevanceChecks = candidates
+        var relevanceChecks = rerankedCandidates
             .Select(candidate => new
             {
                 Candidate = candidate,
@@ -107,12 +115,13 @@ public class RAGService : IRAGService
             totalStopwatch.Stop();
             var noRelevantTotalMs = totalStopwatch.ElapsedMilliseconds;
             _logger.LogInformation(
-                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
+                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
                 noRelevantTotalMs,
                 embeddingMs,
                 vectorSearchMs,
                 relevanceValidationMs,
                 0,
+                rerankingMs,
                 retrievalTopK,
                 relevanceTopK,
                 candidatesRetrieved,
@@ -146,12 +155,13 @@ User question:
         var totalMs = totalStopwatch.ElapsedMilliseconds;
 
         _logger.LogInformation(
-            "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
+            "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
             totalMs,
             embeddingMs,
             vectorSearchMs,
             relevanceValidationMs,
             finalLlmMs,
+            rerankingMs,
             retrievalTopK,
             relevanceTopK,
             candidatesRetrieved,
