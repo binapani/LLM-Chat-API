@@ -8,7 +8,6 @@ public class RAGService : IRAGService
     private readonly IEmbeddingService _embeddingService;
     private readonly IVectorStore _vectorStore;
     private readonly ILLMService _llmService;
-    private readonly IRelevanceService _relevanceService;
     private readonly IReranker _reranker;
     private readonly IConfiguration _configuration;
     private readonly ILogger<RAGService> _logger;
@@ -17,7 +16,6 @@ public class RAGService : IRAGService
         IEmbeddingService embeddingService,
         IVectorStore vectorStore,
         ILLMService llmService,
-        IRelevanceService relevanceService,
         IReranker reranker,
         IConfiguration configuration,
         ILogger<RAGService> logger)
@@ -25,7 +23,6 @@ public class RAGService : IRAGService
         _embeddingService = embeddingService;
         _vectorStore = vectorStore;
         _llmService = llmService;
-        _relevanceService = relevanceService;
         _reranker = reranker;
         _configuration = configuration;
         _logger = logger;
@@ -50,91 +47,69 @@ public class RAGService : IRAGService
         var vectorSearchMs = vectorSearchStopwatch.ElapsedMilliseconds;
         var candidatesRetrieved = retrievedCandidates.Count;
 
-        var candidates = retrievedCandidates
+        var filteredCandidates = retrievedCandidates
             .Where(candidate => candidate.Document != null &&
                 !string.IsNullOrWhiteSpace(candidate.Document.Content) &&
                 candidate.Similarity >= minimumSimilarity)
             .OrderByDescending(candidate => candidate.Similarity)
             .ToList();
 
-        var candidatesAfterSimilarityFilter = candidates.Count;
+        var candidatesAfterSimilarityFilter = filteredCandidates.Count;
 
         if (candidatesAfterSimilarityFilter == 0)
         {
             totalStopwatch.Stop();
             var earlyTotalMs = totalStopwatch.ElapsedMilliseconds;
             _logger.LogInformation(
-                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
+                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesAfterReranking={CandidatesAfterReranking}",
                 earlyTotalMs,
                 embeddingMs,
                 vectorSearchMs,
-                0,
                 0,
                 0,
                 retrievalTopK,
                 relevanceTopK,
                 candidatesRetrieved,
                 candidatesAfterSimilarityFilter,
-                0,
                 0);
 
             return "The information is not available in the provided documents.";
         }
 
         var rerankingStopwatch = Stopwatch.StartNew();
-        var rerankedCandidates = await _reranker.RerankAsync(question, candidates, relevanceTopK);
+        var rerankedCandidates = await _reranker.RerankAsync(question, filteredCandidates, relevanceTopK);
         rerankingStopwatch.Stop();
         var rerankingMs = rerankingStopwatch.ElapsedMilliseconds;
 
-        var relevanceValidationStopwatch = Stopwatch.StartNew();
-        var relevanceChecks = rerankedCandidates
-            .Select(candidate => new
-            {
-                Candidate = candidate,
-                IsRelevantTask = _relevanceService.IsRelevantAsync(question, candidate.Document.Content)
-            })
-            .ToList();
+        var candidatesAfterReranking = rerankedCandidates.Count;
 
-        var relevanceResults = await Task.WhenAll(relevanceChecks.Select(item => item.IsRelevantTask));
-        var relevantCandidates = new List<VectorSearchResult>();
-
-        for (var i = 0; i < relevanceChecks.Count; i++)
-        {
-            if (relevanceResults[i])
-            {
-                relevantCandidates.Add(relevanceChecks[i].Candidate);
-            }
-        }
-
-        var candidatesValidated = relevanceChecks.Count;
-        relevanceValidationStopwatch.Stop();
-        var relevanceValidationMs = relevanceValidationStopwatch.ElapsedMilliseconds;
-
-        if (relevantCandidates.Count == 0)
+        if (candidatesAfterReranking == 0)
         {
             totalStopwatch.Stop();
-            var noRelevantTotalMs = totalStopwatch.ElapsedMilliseconds;
+            var noRerankedTotalMs = totalStopwatch.ElapsedMilliseconds;
             _logger.LogInformation(
-                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
-                noRelevantTotalMs,
+                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesAfterReranking={CandidatesAfterReranking}",
+                noRerankedTotalMs,
                 embeddingMs,
                 vectorSearchMs,
-                relevanceValidationMs,
                 0,
                 rerankingMs,
                 retrievalTopK,
                 relevanceTopK,
                 candidatesRetrieved,
                 candidatesAfterSimilarityFilter,
-                candidatesValidated,
-                relevantCandidates.Count);
+                candidatesAfterReranking);
 
             return "The information is not available in the provided documents.";
         }
 
+        var finalContextCandidates = rerankedCandidates
+            .Take(relevanceTopK)
+            .ToList();
+
         var context = string.Join(
             Environment.NewLine + Environment.NewLine,
-            relevantCandidates.Select(result => result.Document.Content));
+            finalContextCandidates.Select(result => result.Document.Content));
 
         var prompt = $@"You are an enterprise assistant.
 Answer the user's question using ONLY the information provided in the context.
@@ -155,19 +130,17 @@ User question:
         var totalMs = totalStopwatch.ElapsedMilliseconds;
 
         _logger.LogInformation(
-            "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
+            "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesAfterReranking={CandidatesAfterReranking}",
             totalMs,
             embeddingMs,
             vectorSearchMs,
-            relevanceValidationMs,
             finalLlmMs,
             rerankingMs,
             retrievalTopK,
             relevanceTopK,
             candidatesRetrieved,
             candidatesAfterSimilarityFilter,
-            candidatesValidated,
-            relevantCandidates.Count);
+            candidatesAfterReranking);
 
         return finalAnswer;
     }
