@@ -22,6 +22,7 @@ builder.Services.AddScoped<IVectorStore, SQLiteVectorStore>();
 builder.Services.AddScoped<IDocumentIngestionService, DocumentIngestionService>();
 builder.Services.AddSingleton<IDocumentChunker, DocumentChunker>();
 builder.Services.AddScoped<IRAGService, RAGService>();
+builder.Services.AddScoped<IRelevanceService, RelevanceService>();
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

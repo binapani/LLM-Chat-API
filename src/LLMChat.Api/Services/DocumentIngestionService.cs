@@ -18,12 +18,13 @@ public class DocumentIngestionService : IDocumentIngestionService
         _documentChunker = documentChunker;
     }
 
-    public async Task IngestAsync(IEnumerable<string> documents)
+    public async Task IngestAsync(IEnumerable<(string Source, string Content)> documents)
     {
         foreach (var document in documents)
         {
             var documentId = Guid.NewGuid().ToString();
-            var chunks = _documentChunker.Chunk(document, 500, 50);
+            var source = string.IsNullOrWhiteSpace(document.Source) ? "unknown" : document.Source;
+            var chunks = _documentChunker.Chunk(document.Content, 500, 50);
             var chunkIndex = 0;
 
             foreach (var chunk in chunks)
@@ -35,7 +36,7 @@ public class DocumentIngestionService : IDocumentIngestionService
                     ChunkId = chunkIndex,
                     Content = chunk,
                     Embedding = embedding,
-                    Source = "ingestion"
+                    Source = source
                 };
 
                 await _vectorStore.AddAsync(documentVector);
