@@ -523,6 +523,145 @@ This project demonstrates several core engineering patterns:
 
 This project intentionally keeps the implementation small, local, and educational. It is a learning-focused portfolio project designed to make the mechanics of a local Ollama-backed RAG API understandable before introducing more advanced retrieval, evaluation, reranking, and production-scale architecture.
 
+## Real Document Upload & Ingestion
+
+The project now supports uploading a real document through an HTTP API instead of relying only on hardcoded documents.
+
+### New endpoint
+
+`POST /api/Documents/upload`
+
+The endpoint accepts an uploaded document and sends it through the ingestion pipeline.
+
+### Architecture
+
+```text
+File Upload
+    ↓
+DocumentsController
+    ↓
+IDocumentTextExtractor
+    ↓
+PlainTextDocumentExtractor
+    ↓
+DocumentIngestionService
+    ↓
+DocumentChunker
+    ↓
+Embedding Service
+    ↓
+Vector Store
+    ↓
+RAG Retrieval
+    ↓
+Hybrid Reranker
+    ↓
+Grounded LLM Answer
+```
+
+### Document extraction abstraction
+
+Introduced:
+
+`IDocumentTextExtractor`
+
+This abstraction separates document text extraction from the controller and ingestion pipeline.
+
+Current implementation:
+
+`PlainTextDocumentExtractor`
+
+Supported formats:
+
+- `.txt`
+- `.md`
+- `.csv`
+
+The extractor:
+- Uses UTF-8 encoding.
+- Reads files asynchronously.
+- Supports `CancellationToken`.
+- Validates file names and extensions.
+- Does not take ownership of the caller's stream.
+
+### Upload API response
+
+A real test document was uploaded successfully.
+
+Example response:
+
+```json
+{
+  "fileName": "annual-leave-test.txt",
+  "message": "Document uploaded and ingested successfully.",
+  "extractedCharacterCount": 280
+}
+```
+
+### End-to-end validation
+
+The uploaded annual-leave document was successfully:
+
+1. Uploaded through the API.
+2. Extracted into text.
+3. Ingested through `DocumentIngestionService`.
+4. Chunked.
+5. Embedded.
+6. Stored in the vector store.
+7. Retrieved through the RAG pipeline.
+8. Used to generate a grounded answer.
+
+The positive query successfully returned the annual-leave information.
+
+A negative query for maternity leave correctly returned:
+
+"The information is not available in the provided documents."
+
+### Architectural improvement
+
+Previously, test documents were hardcoded inside `ChatController`.
+
+The new architecture separates:
+
+- HTTP/API concerns
+- Document extraction
+- Document ingestion
+- Chunking
+- Embedding
+- Vector storage
+- Retrieval
+- Reranking
+- Generation
+
+This makes the system easier to extend with additional document formats later.
+
+### Current limitation
+
+PDF and DOCX extraction are not implemented yet.
+
+The current implementation intentionally starts with plain-text-compatible formats so the complete upload-to-RAG workflow can be validated before adding format-specific extraction libraries.
+
+### Milestone Status
+
+Completed:
+
+- File upload API
+- Document extraction abstraction
+- Plain-text extraction
+- Document ingestion
+- Chunking
+- Embedding
+- Vector storage
+- RAG retrieval
+- Hybrid reranking
+- End-to-end file-to-answer validation
+
+Next planned milestone:
+
+- PDF/DOCX document extraction
+- Document metadata management
+- Better document lifecycle management
+
 ## Future Roadmap
 
 The following capabilities are planned learning milestones and are not implemented as production-grade architecture in the current codebase:
