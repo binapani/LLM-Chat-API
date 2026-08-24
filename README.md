@@ -299,6 +299,84 @@ The current pipeline is:
 7. Build grounded context
 8. Generate final answer with Qwen
 
+## Hybrid Reranking
+
+A lightweight deterministic `HybridReranker` was introduced between vector retrieval and final generation.
+
+The current scoring formula is:
+
+```text
+combinedScore =
+    (semanticSimilarity * 0.70)
+    +
+    (keywordOverlap * 0.30)
+```
+
+This reranker is designed to improve the ordering of retrieved candidates before the final grounded prompt is assembled.
+
+- Semantic similarity provides the embedding-based relevance signal.
+- Keyword overlap provides a lexical relevance signal.
+- The combined score is used to reorder retrieved candidates.
+- The reranker does not call an LLM.
+- The reranker is intended to be inexpensive compared with LLM-based relevance validation.
+
+## RerankedResult
+
+The reranking step now returns a richer result structure built from:
+
+- `VectorSearchResult`
+- `Score`
+
+Each reranked item preserves the original vector-search result and adds a ranking heuristic score. This score is a ranking/confidence heuristic and is NOT a calibrated probability.
+
+## Reranker Performance
+
+The lightweight reranker itself is very fast compared with the LLM stages.
+
+Measured reranking latency from the experiment:
+
+- Annual leave test: approximately 6–7 ms
+- Maternity leave test: approximately 0 ms in the recorded run
+
+These timings show that the reranker is inexpensive relative to final generation and LLM-based validation, making it a practical candidate for a cheaper second-stage ranking step.
+
+## Reranker Score Experiment
+
+The following measured scores were observed during the reranker experiment:
+
+| Question | Top Reranker Score | Expected |
+|---|---:|---|
+| How many days of annual leave do full-time employees receive? | 0.88342714 | Relevant |
+| What is the maternity leave policy? | 0.63726586 | Not available |
+
+These two results suggest a possible separation between relevant and irrelevant queries, but they are NOT sufficient to establish a production confidence threshold.
+
+The important caveat is that reranker scores are heuristic ranking scores rather than calibrated probabilities. A high reranker score indicates that a candidate ranks strongly under the current lexical-plus-semantic formula, but it does not mean the score has been validated as a statistically meaningful confidence measure.
+
+## Confidence Gate — Next Experiment
+
+This is the next milestone for a future confidence threshold experiment:
+
+```text
+Question
+   ↓
+Embedding
+   ↓
+Vector Search
+   ↓
+Similarity Threshold
+   ↓
+Hybrid Reranker
+   ↓
+Confidence Threshold
+      /        \
+    LOW        HIGH
+     ↓           ↓
+No Context     Final Qwen
+```
+
+This future experiment would test whether a lightweight confidence gate can separate clearly answerable questions from unanswerable ones before the final generation stage. It is intentionally a future milestone and not a production claim.
+
 ## Next Milestone — Reranking
 
 The current relevance-validation approach uses a generative LLM multiple times and is therefore expensive. This remains a valid prototype design, but it is not the most efficient production approach.

@@ -10,14 +10,14 @@ public class HybridReranker : IReranker
         "the", "is", "a", "an", "of", "to", "in", "for", "and", "on", "what", "how", "does", "do"
     };
 
-    public Task<IReadOnlyList<VectorSearchResult>> RerankAsync(
+    public Task<IReadOnlyList<RerankedResult>> RerankAsync(
         string query,
         IReadOnlyList<VectorSearchResult> candidates,
         int topK)
     {
         if (string.IsNullOrWhiteSpace(query) || candidates == null || candidates.Count == 0 || topK <= 0)
         {
-            return Task.FromResult<IReadOnlyList<VectorSearchResult>>(Array.Empty<VectorSearchResult>());
+            return Task.FromResult<IReadOnlyList<RerankedResult>>(Array.Empty<RerankedResult>());
         }
 
         var queryTokens = Tokenize(query);
@@ -28,7 +28,7 @@ public class HybridReranker : IReranker
 
         if (meaningfulQueryTokens.Count == 0)
         {
-            return Task.FromResult<IReadOnlyList<VectorSearchResult>>(Array.Empty<VectorSearchResult>());
+            return Task.FromResult<IReadOnlyList<RerankedResult>>(Array.Empty<RerankedResult>());
         }
 
         // Semantic similarity tells us whether the candidate is broadly aligned with the query.
@@ -47,18 +47,17 @@ public class HybridReranker : IReranker
                 // that are both close in embedding space and explicitly mention the query terms.
                 var combinedScore = (candidate.Similarity * 0.70f) + (keywordScore * 0.30f);
 
-                return new
+                return new RerankedResult
                 {
-                    Candidate = candidate,
-                    CombinedScore = combinedScore
+                    Result = candidate,
+                    Score = combinedScore
                 };
             })
-            .OrderByDescending(x => x.CombinedScore)
+            .OrderByDescending(x => x.Score)
             .Take(topK)
-            .Select(x => x.Candidate)
             .ToList();
 
-        return Task.FromResult<IReadOnlyList<VectorSearchResult>>(reranked);
+        return Task.FromResult<IReadOnlyList<RerankedResult>>(reranked);
     }
 
     private static IReadOnlyList<string> Tokenize(string text)

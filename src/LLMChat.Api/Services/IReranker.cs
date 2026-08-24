@@ -4,7 +4,7 @@ namespace LLMChat.Api.Services;
 
 public interface IReranker
 {
-    Task<IReadOnlyList<VectorSearchResult>> RerankAsync(
+    Task<IReadOnlyList<RerankedResult>> RerankAsync(
         string query,
         IReadOnlyList<VectorSearchResult> candidates,
         int topK);

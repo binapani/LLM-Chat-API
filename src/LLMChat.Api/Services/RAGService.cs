@@ -61,12 +61,13 @@ public class RAGService : IRAGService
             totalStopwatch.Stop();
             var earlyTotalMs = totalStopwatch.ElapsedMilliseconds;
             _logger.LogInformation(
-                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesAfterReranking={CandidatesAfterReranking}",
+                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, TopRerankerScore={TopRerankerScore}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesAfterReranking={CandidatesAfterReranking}",
                 earlyTotalMs,
                 embeddingMs,
                 vectorSearchMs,
                 0,
                 0,
+                0f,
                 retrievalTopK,
                 relevanceTopK,
                 candidatesRetrieved,
@@ -82,18 +83,20 @@ public class RAGService : IRAGService
         var rerankingMs = rerankingStopwatch.ElapsedMilliseconds;
 
         var candidatesAfterReranking = rerankedCandidates.Count;
+        var topRerankerScore = rerankedCandidates.Count > 0 ? rerankedCandidates[0].Score : 0f;
 
         if (candidatesAfterReranking == 0)
         {
             totalStopwatch.Stop();
             var noRerankedTotalMs = totalStopwatch.ElapsedMilliseconds;
             _logger.LogInformation(
-                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesAfterReranking={CandidatesAfterReranking}",
+                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, TopRerankerScore={TopRerankerScore}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesAfterReranking={CandidatesAfterReranking}",
                 noRerankedTotalMs,
                 embeddingMs,
                 vectorSearchMs,
                 0,
                 rerankingMs,
+                topRerankerScore,
                 retrievalTopK,
                 relevanceTopK,
                 candidatesRetrieved,
@@ -105,6 +108,7 @@ public class RAGService : IRAGService
 
         var finalContextCandidates = rerankedCandidates
             .Take(relevanceTopK)
+            .Select(result => result.Result)
             .ToList();
 
         var context = string.Join(
@@ -130,12 +134,13 @@ User question:
         var totalMs = totalStopwatch.ElapsedMilliseconds;
 
         _logger.LogInformation(
-            "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesAfterReranking={CandidatesAfterReranking}",
+            "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, FinalLlmMs={FinalLlmMs}, RerankingMs={RerankingMs}, TopRerankerScore={TopRerankerScore}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesAfterReranking={CandidatesAfterReranking}",
             totalMs,
             embeddingMs,
             vectorSearchMs,
             finalLlmMs,
             rerankingMs,
+            topRerankerScore,
             retrievalTopK,
             relevanceTopK,
             candidatesRetrieved,
