@@ -67,7 +67,7 @@ public class ChatController : ControllerBase
     }
 
     [HttpPost("search")]
-    public async Task<ActionResult<IReadOnlyList<DocumentVector>>> Search([FromBody] ChatRequest request)
+    public async Task<ActionResult<IReadOnlyList<VectorSearchResult>>> Search([FromBody] ChatRequest request)
     {
         var queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(request.Message);
         var results = await _vectorStore.SearchAsync(queryEmbedding, 2);

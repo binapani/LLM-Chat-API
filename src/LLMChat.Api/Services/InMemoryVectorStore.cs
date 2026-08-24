@@ -12,20 +12,19 @@ public class InMemoryVectorStore : IVectorStore
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<DocumentVector>> SearchAsync(float[] queryEmbedding, int topK)
+    public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(float[] queryEmbedding, int topK)
     {
         var results = _documents
-            .Select(document => new
+            .Select(document => new VectorSearchResult
             {
                 Document = document,
                 Similarity = CalculateCosineSimilarity(queryEmbedding, document.Embedding)
             })
             .OrderByDescending(result => result.Similarity)
             .Take(topK)
-            .Select(result => result.Document)
             .ToList();
 
-        return Task.FromResult<IReadOnlyList<DocumentVector>>(results);
+        return Task.FromResult<IReadOnlyList<VectorSearchResult>>(results);
     }
 
     private static float CalculateCosineSimilarity(float[] first, float[] second)

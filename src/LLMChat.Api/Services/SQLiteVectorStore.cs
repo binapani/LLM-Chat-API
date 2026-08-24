@@ -29,14 +29,14 @@ public class SQLiteVectorStore : IVectorStore
         await _dbContext.SaveChangesAsync();
     }
 
-    public async Task<IReadOnlyList<DocumentVector>> SearchAsync(float[] queryEmbedding, int topK)
+    public async Task<IReadOnlyList<VectorSearchResult>> SearchAsync(float[] queryEmbedding, int topK)
     {
         var entities = await _dbContext.DocumentVectors
             .AsNoTracking()
             .ToListAsync();
 
         var results = entities
-            .Select(entity => new
+            .Select(entity => new VectorSearchResult
             {
                 Document = new DocumentVector
                 {
@@ -50,7 +50,6 @@ public class SQLiteVectorStore : IVectorStore
             })
             .OrderByDescending(result => result.Similarity)
             .Take(topK)
-            .Select(result => result.Document)
             .ToList();
 
         return results;
