@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LLMChat.Api.Models;
 
 namespace LLMChat.Api.Services;
@@ -8,50 +9,117 @@ public class RAGService : IRAGService
     private readonly IVectorStore _vectorStore;
     private readonly ILLMService _llmService;
     private readonly IRelevanceService _relevanceService;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<RAGService> _logger;
 
     public RAGService(
         IEmbeddingService embeddingService,
         IVectorStore vectorStore,
         ILLMService llmService,
-        IRelevanceService relevanceService)
+        IRelevanceService relevanceService,
+        IConfiguration configuration,
+        ILogger<RAGService> logger)
     {
         _embeddingService = embeddingService;
         _vectorStore = vectorStore;
         _llmService = llmService;
         _relevanceService = relevanceService;
+        _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<string> GenerateAnswerAsync(string question)
     {
-        var queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(question);
-        var candidates = await _vectorStore.SearchAsync(queryEmbedding, 5);
+        var totalStopwatch = Stopwatch.StartNew();
+        var embeddingStopwatch = Stopwatch.StartNew();
 
-        if (candidates.Count == 0)
+        var minimumSimilarity = _configuration.GetValue<double>("Rag:MinimumSimilarity", 0.50);
+        var retrievalTopK = _configuration.GetValue<int>("Rag:RetrievalTopK", 5);
+        var relevanceTopK = _configuration.GetValue<int>("Rag:RelevanceTopK", 3);
+
+        var queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(question);
+        embeddingStopwatch.Stop();
+        var embeddingMs = embeddingStopwatch.ElapsedMilliseconds;
+
+        var vectorSearchStopwatch = Stopwatch.StartNew();
+        var retrievedCandidates = await _vectorStore.SearchAsync(queryEmbedding, retrievalTopK);
+        vectorSearchStopwatch.Stop();
+        var vectorSearchMs = vectorSearchStopwatch.ElapsedMilliseconds;
+        var candidatesRetrieved = retrievedCandidates.Count;
+
+        var candidates = retrievedCandidates
+            .Where(candidate => candidate.Document != null &&
+                !string.IsNullOrWhiteSpace(candidate.Document.Content) &&
+                candidate.Similarity >= minimumSimilarity)
+            .OrderByDescending(candidate => candidate.Similarity)
+            .Take(relevanceTopK)
+            .ToList();
+
+        var candidatesAfterSimilarityFilter = candidates.Count;
+
+        if (candidatesAfterSimilarityFilter == 0)
         {
+            totalStopwatch.Stop();
+            var earlyTotalMs = totalStopwatch.ElapsedMilliseconds;
+            _logger.LogInformation(
+                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
+                earlyTotalMs,
+                embeddingMs,
+                vectorSearchMs,
+                0,
+                0,
+                retrievalTopK,
+                relevanceTopK,
+                candidatesRetrieved,
+                candidatesAfterSimilarityFilter,
+                0,
+                0);
+
             return "The information is not available in the provided documents.";
         }
 
+        var relevanceValidationStopwatch = Stopwatch.StartNew();
+        var relevanceChecks = candidates
+            .Select(candidate => new
+            {
+                Candidate = candidate,
+                IsRelevantTask = _relevanceService.IsRelevantAsync(question, candidate.Document.Content)
+            })
+            .ToList();
+
+        var relevanceResults = await Task.WhenAll(relevanceChecks.Select(item => item.IsRelevantTask));
         var relevantCandidates = new List<VectorSearchResult>();
 
-        foreach (var candidate in candidates)
+        for (var i = 0; i < relevanceChecks.Count; i++)
         {
-            var content = candidate.Document?.Content;
-
-            if (string.IsNullOrWhiteSpace(content))
+            if (relevanceResults[i])
             {
-                continue;
-            }
-
-            var isRelevant = await _relevanceService.IsRelevantAsync(question, content);
-
-            if (isRelevant)
-            {
-                relevantCandidates.Add(candidate);
+                relevantCandidates.Add(relevanceChecks[i].Candidate);
             }
         }
 
+        var candidatesValidated = relevanceChecks.Count;
+        relevanceValidationStopwatch.Stop();
+        var relevanceValidationMs = relevanceValidationStopwatch.ElapsedMilliseconds;
+
         if (relevantCandidates.Count == 0)
         {
+            totalStopwatch.Stop();
+            var noRelevantTotalMs = totalStopwatch.ElapsedMilliseconds;
+            _logger.LogInformation(
+                "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
+                noRelevantTotalMs,
+                embeddingMs,
+                vectorSearchMs,
+                relevanceValidationMs,
+                0,
+                retrievalTopK,
+                relevanceTopK,
+                candidatesRetrieved,
+                candidatesAfterSimilarityFilter,
+                candidatesValidated,
+                relevantCandidates.Count);
+
             return "The information is not available in the provided documents.";
         }
 
@@ -70,6 +138,27 @@ Context:
 User question:
 {question}";
 
-        return await _llmService.GenerateAnswerAsync(prompt);
+        var finalLlmStopwatch = Stopwatch.StartNew();
+        var finalAnswer = await _llmService.GenerateAnswerAsync(prompt);
+        finalLlmStopwatch.Stop();
+        var finalLlmMs = finalLlmStopwatch.ElapsedMilliseconds;
+        totalStopwatch.Stop();
+        var totalMs = totalStopwatch.ElapsedMilliseconds;
+
+        _logger.LogInformation(
+            "RAG completed. TotalMs={TotalMs}, EmbeddingMs={EmbeddingMs}, VectorSearchMs={VectorSearchMs}, RelevanceValidationMs={RelevanceValidationMs}, FinalLlmMs={FinalLlmMs}, RetrievalTopK={RetrievalTopK}, RelevanceTopK={RelevanceTopK}, CandidatesRetrieved={CandidatesRetrieved}, CandidatesAfterSimilarityFilter={CandidatesAfterSimilarityFilter}, CandidatesValidated={CandidatesValidated}, RelevantCandidates={RelevantCandidates}",
+            totalMs,
+            embeddingMs,
+            vectorSearchMs,
+            relevanceValidationMs,
+            finalLlmMs,
+            retrievalTopK,
+            relevanceTopK,
+            candidatesRetrieved,
+            candidatesAfterSimilarityFilter,
+            candidatesValidated,
+            relevantCandidates.Count);
+
+        return finalAnswer;
     }
 }
