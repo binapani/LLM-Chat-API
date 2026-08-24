@@ -1,127 +1,375 @@
-# LLM Chat API
+# LLM Chat API — Enterprise RAG
 
-A focused .NET 8 ASP.NET Core Web API for learning how local large language models, embeddings, semantic search, and Retrieval-Augmented Generation (RAG) fit together.
+A .NET 8 ASP.NET Core Web API demonstrating an enterprise-style retrieval-augmented generation workflow using local AI services, embeddings, SQLite persistence, and structured observability.
 
-The API uses [Ollama](https://ollama.com/) locally:
+This project is designed as a practical learning portfolio and prototype for understanding how a local RAG pipeline operates in practice. It combines C#, ASP.NET Core, Ollama, embeddings, semantic search, relevance validation, and performance logging in a single codebase.
 
-- `qwen2.5:3b` generates text responses.
-- `nomic-embed-text` generates embeddings.
-- Prompt engineering gives the text model a consistent audience and response focus.
-- An in-memory vector store ranks documents using cosine similarity.
+## Project Overview
 
-## Completed Features
+This project demonstrates a complete local RAG pipeline using:
 
-### Text generation and prompt engineering
+- C#
+- ASP.NET Core
+- Ollama / Qwen
+- Embeddings
+- SQLite
+- Entity Framework Core
+- Vector similarity search
+- Relevance validation
+- Structured performance logging
 
-`LLMService` sends requests to Ollama's `/api/generate` endpoint through an injected `HttpClient`. Each prompt includes a system instruction for experienced software engineers, followed by the user's message. Responses are returned through the `ChatResponse` model.
+The API ingests document content, embeds it, stores the vectors in SQLite, retrieves the closest matches for a user question, validates candidate relevance, and sends only grounded context to Qwen for final answer generation.
 
-### Embeddings
-
-`IEmbeddingService` defines the embedding contract, and `EmbeddingService` calls Ollama's `/api/embeddings` endpoint with the `nomic-embed-text` model. The generated vector is returned as `float[]`.
-
-### In-memory semantic search
-
-`IVectorStore` defines document storage and search operations. `InMemoryVectorStore` stores `DocumentVector` objects in memory and calculates cosine similarity between a query embedding and each stored embedding. Results are ordered by descending similarity.
-
-### Document ingestion
-
-`DocumentIngestionService` uses `IEmbeddingService` to embed each document and then stores the resulting `DocumentVector` through `IVectorStore`.
-
-### End-to-end RAG
-
-`RAGService` coordinates the complete pipeline:
+## Current Architecture
 
 ```text
-Question -> Embedding -> Vector Search -> Retrieved Context -> Qwen -> Answer
+User Question
+    ↓
+Embedding Generation
+    ↓
+SQLite Vector Search
+    ↓
+Top-K Retrieval
+    ↓
+Similarity Threshold
+    ↓
+Relevance Validation
+    ↓
+Relevant Context
+    ↓
+Grounded Prompt
+    ↓
+Qwen
+    ↓
+Answer
 ```
 
-It retrieves the top two matching documents, includes their content in a prompt with the question, and sends that prompt to `ILLMService`. When no documents are available, it returns `No relevant information was found.`
+### Stage responsibilities
+
+1. Embedding Generation
+   - Converts the user question into an embedding using the configured embedding model.
+   - This produces a vector representation suitable for semantic similarity search.
+
+2. SQLite Vector Search
+   - Compares the query embedding to previously stored document embeddings.
+   - Uses cosine similarity to rank chunks by semantic proximity.
+
+3. Top-K Retrieval
+   - Fetches a bounded set of candidate chunks based on the configured retrieval size.
+   - This keeps the retrieval stage tractable before applying further filtering.
+
+4. Similarity Threshold
+   - Applies `Rag:MinimumSimilarity` to eliminate weak matches before deeper validation.
+   - This reduces noise and avoids sending irrelevant chunks downstream.
+
+5. Relevance Validation
+   - Invokes the Qwen-based relevance classifier for the strongest candidate chunks.
+   - Keeps only candidates that can directly answer the user's question.
+
+6. Relevant Context
+   - Builds the final context from only those document chunks classified as relevant.
+
+7. Grounded Prompt
+   - Sends the question and filtered context to the generation model.
+   - The model is instructed to answer only from the supplied context.
+
+8. Qwen Answer Generation
+   - Produces the final answer when grounded context exists.
+
+## Document Ingestion
+
+Documents are ingested as:
+
+```text
+(Source, Content)
+```
+
+The current ingestion pipeline performs the following steps:
+
+- Generates a `DocumentId`
+- Splits content into chunks using a size of 500 characters and an overlap of 50 characters
+- Generates embeddings for each chunk
+- Stores `DocumentId`, `ChunkId`, `Source`, `Content`, and `Embedding` in SQLite
+
+The current sample sources are:
+
+- `password-policy`
+- `annual-leave-policy`
+- `cafeteria-policy`
+
+Example ingestion behavior:
+
+- each source gets a unique document identifier
+- each document is chunked deterministically
+- each chunk is embedded and stored as a searchable vector
+
+## Vector Search
+
+The vector search layer uses SQLite as the persistence layer and stores embeddings alongside chunk metadata.
+
+### Behavior
+
+- Embeddings are stored in SQLite
+- Search calculates cosine similarity between the query embedding and the stored embeddings
+- Results are ordered by descending similarity
+- Top-K candidates are retrieved
+- `Rag:MinimumSimilarity` is used as a configurable threshold
+
+Current configuration:
+
+```json
+"Rag": {
+  "MinimumSimilarity": 0.50,
+  "RetrievalTopK": 5,
+  "RelevanceTopK": 3
+}
+```
+
+This configuration reflects the current lightweight prototype approach and is meant to be tuned with evaluation data instead of assumed to be universally correct.
+
+## Important Retrieval Lesson
+
+A false-positive retrieval test highlighted why similarity alone is not enough.
+
+### Example false-positive case
+
+Question:
+
+```text
+What is the maternity leave policy?
+```
+
+The vector search returned:
+
+- `annual-leave-policy`
+- similarity = `0.6246655`
+
+This demonstrated that cosine similarity can surface a content item that is related to the broader domain but still does not directly answer the question. In other words, the vector search identified a candidate with a strong similarity score, but the document was not actually relevant to the question being asked.
+
+Therefore, a similarity threshold alone is not sufficient for reliable RAG. Retrieval quality must be checked again before building the final context.
+
+## Relevance Validation
+
+The project includes a dedicated `IRelevanceService` and `RelevanceService`.
+
+After vector retrieval, the strongest candidates are checked with Qwen using a strict YES/NO relevance classification. The sequence is:
+
+```text
+Vector Search
+    ↓
+Top candidates
+    ↓
+RelevanceService
+    ↓
+YES → keep
+NO → discard
+```
+
+The relevance validation prompt asks whether the supplied context contains information that can directly help answer the question, and the model is constrained to respond with only:
+
+- `YES`
+- `NO`
+
+If no candidate is relevant, the API returns:
+
+```text
+The information is not available in the provided documents.
+```
+
+## RAG Test Results
+
+These tests were verified during the project’s retrieval validation work.
+
+### Test 1
+
+Question:
+
+```text
+How many days of annual leave do full-time employees receive?
+```
+
+Result:
+
+```text
+Full-time employees receive twenty days of annual leave per year.
+```
+
+### Test 2
+
+Question:
+
+```text
+What is the maternity leave policy?
+```
+
+Result:
+
+```text
+The information is not available in the provided documents.
+```
+
+These results demonstrate both:
+
+- successful grounded retrieval when the answer is present
+- rejection of an irrelevant retrieved document when it does not actually answer the question
+
+## Performance Monitoring
+
+The current `RAGService` uses:
+
+- `ILogger<RAGService>`
+- `Stopwatch`
+
+The pipeline tracks these metrics at Information level:
+
+- `TotalMs`
+- `EmbeddingMs`
+- `VectorSearchMs`
+- `RelevanceValidationMs`
+- `FinalLlmMs`
+- `RetrievalTopK`
+- `RelevanceTopK`
+- `CandidatesRetrieved`
+- `CandidatesAfterSimilarityFilter`
+- `CandidatesValidated`
+- `RelevantCandidates`
+
+These metrics are intended to support performance measurement and retrieval analysis, not to imply that a pipeline is optimal without comparative measurement.
+
+## Performance Experiment
+
+The project recorded a measured baseline and a concurrent relevance-validation experiment.
+
+### Before concurrent relevance validation
+
+```text
+TotalMs = 51519
+EmbeddingMs = 3508
+VectorSearchMs = 1145
+RelevanceValidationMs = 35476
+FinalLlmMs = 11388
+CandidatesValidated = 3
+```
+
+### After Task.WhenAll concurrent relevance validation
+
+```text
+TotalMs = 48154
+EmbeddingMs = 3473
+VectorSearchMs = 874
+RelevanceValidationMs = 33387
+FinalLlmMs = 10417
+CandidatesValidated = 3
+```
+
+This run showed approximately a 6.5% reduction in total latency:
+
+```text
+(51519 - 48154) / 51519 ≈ 0.065
+```
+
+This means the total request latency dropped by roughly 6.5% in this measured run.
+
+### Important note on concurrency
+
+This does not prove that `Task.WhenAll` guarantees parallel model inference. It only shows that application-level concurrency reduced the wall-clock time of the relevance-validation phase in the local environment. The local Ollama/runtime configuration may still impose a bottleneck on concurrent inference, so the LLM itself may remain the dominant limiting factor.
+
+## Architectural Lessons
+
+The project surfaced several practical lessons:
+
+1. Vector similarity is retrieval, not proof of relevance.
+2. RAG requires retrieval-quality evaluation.
+3. Metadata improves observability and enables future filtering strategies.
+4. Expensive LLM calls should be minimized.
+5. Performance must be measured rather than assumed.
+6. Application-level concurrency does not guarantee model-level parallelism.
+7. Production RAG should balance accuracy, latency, cost, security, and scalability.
+
+## Current RAG Pipeline
+
+The current pipeline is:
+
+1. Generate query embedding
+2. Retrieve up to `RetrievalTopK` candidates
+3. Apply `MinimumSimilarity`
+4. Sort by similarity
+5. Keep up to `RelevanceTopK` candidates
+6. Validate relevance
+7. Build grounded context
+8. Generate final answer with Qwen
+
+## Next Milestone — Reranking
+
+The current relevance-validation approach uses a generative LLM multiple times and is therefore expensive. This remains a valid prototype design, but it is not the most efficient production approach.
+
+### Current flow
+
+```text
+Vector Search
+    ↓
+Qwen relevance check × up to 3
+    ↓
+Final Qwen
+```
+
+### Target flow
+
+```text
+Vector Search
+    ↓
+Lightweight Reranker
+    ↓
+Relevant candidates
+    ↓
+Final Qwen
+```
+
+This is the next milestone. The concepts are:
+
+- Retriever = finds possible candidates
+- Reranker = determines which candidates are most relevant
+- Generator = produces the final answer
+
+This will be investigated as a future improvement, but it is not implemented in the current codebase and is clearly marked as the next milestone.
 
 ## API Endpoints
 
-The default HTTP development URL is `http://localhost:5166`. Swagger is available at `/swagger` when running in the Development environment.
+The default development URL is `http://localhost:5166`. Swagger is available at `/swagger` when running in the Development environment.
 
 ### `POST /api/chat`
 
-Generate a direct answer from Qwen.
-
-Request:
-
-```json
-{
-	"message": "Explain dependency injection in ASP.NET Core."
-}
-```
+Generates a direct answer from Qwen using a prompt-only request.
 
 ### `POST /api/chat/embedding`
 
-Generate an embedding for a plain string request body.
-
-```json
-"Explain dependency injection in ASP.NET Core."
-```
+Generates an embedding for the supplied text.
 
 ### `POST /api/chat/ingest`
 
-Ingests three built-in sample documents covering password reset, annual leave, and cafeteria opening hours. This endpoint does not require a request body.
+Ingests the current sample policy documents, chunks and embeds them, and stores the metadata and vectors in SQLite.
 
 ### `POST /api/chat/search`
 
-Embeds the question and returns the two most similar stored `DocumentVector` results.
+Embeds the question and returns the top matching `DocumentVector` results using cosine similarity.
 
-Request:
+### `POST /api/chat/accurate-search`
 
-```json
-{
-	"message": "When is the cafeteria open?"
-}
-```
+Embeds the question, retrieves up to the configured Top-K candidates, applies `Rag:MinimumSimilarity`, and returns the relevant metadata plus the content.
 
 ### `POST /api/chat/rag`
 
-Runs the complete RAG pipeline and returns a `ChatResponse`.
+Runs the complete retrieval and generation pipeline using the embedded search, relevance validation, grounded prompt, and Qwen answer generation.
 
-Request:
+## Interview Talking Points
 
-```json
-{
-	"message": "How do I reset my password?"
-}
-```
+These are concise senior/architect-level talking points suitable for a portfolio discussion:
 
-The in-memory store starts empty each time the API process starts. Call `/api/chat/ingest` before using `/api/chat/search` or `/api/chat/rag` with the sample data.
-
-## Project Structure
-
-```text
-LLM-Chat-API/
-├── README.md
-└── src/
-		└── LLMChat.Api/
-				├── Controllers/
-				│   └── ChatController.cs
-				├── Models/
-				│   ├── ChatRequest.cs
-				│   ├── ChatResponse.cs
-				│   ├── DocumentVector.cs
-				│   ├── OllamaEmbeddingRequest.cs
-				│   ├── OllamaEmbeddingResponse.cs
-				│   ├── OllamaRequest.cs
-				│   └── OllamaResponse.cs
-				├── Services/
-				│   ├── DocumentIngestionService.cs
-				│   ├── EmbeddingService.cs
-				│   ├── IEmbeddingService.cs
-				│   ├── IDocumentIngestionService.cs
-				│   ├── ILLMService.cs
-				│   ├── IRAGService.cs
-				│   ├── IVectorStore.cs
-				│   ├── InMemoryVectorStore.cs
-				│   ├── LLMService.cs
-				│   └── RAGService.cs
-				├── Program.cs
-				└── LLMChat.Api.csproj
-```
+- "I identified a false-positive retrieval case where cosine similarity returned a semantically related but incorrect document."
+- "I introduced second-stage relevance validation to prevent irrelevant context from reaching the final generation step."
+- "I instrumented the RAG pipeline with structured latency metrics."
+- "I measured the impact of concurrent relevance validation rather than assuming it improved performance."
+- "The measurements showed that LLM relevance validation remained the dominant bottleneck, leading to the architectural decision to investigate dedicated reranking."
 
 ## Local Setup
 
@@ -129,27 +377,26 @@ LLM-Chat-API/
 
 - .NET 8 SDK
 - Ollama
+- SQLite tooling is optional for inspection; the project uses EF Core and the SQLite database file directly
 
 ### 1. Install and start Ollama
 
-Install Ollama for your operating system, then make sure the Ollama service is running. Pull the models used by this project:
+Install Ollama for your operating system, then start the service.
 
 ```bash
 ollama pull qwen2.5:3b
 ollama pull nomic-embed-text
 ```
 
-Ollama should be reachable at `http://localhost:11434`.
-
-### 2. Verify Ollama
+### 2. Verify the models
 
 Text generation:
 
 ```bash
 curl http://localhost:11434/api/generate -d '{
-	"model": "qwen2.5:3b",
-	"prompt": "Explain RAG in one sentence.",
-	"stream": false
+  "model": "qwen2.5:3b",
+  "prompt": "Explain RAG in one sentence.",
+  "stream": false
 }'
 ```
 
@@ -157,8 +404,8 @@ Embeddings:
 
 ```bash
 curl http://localhost:11434/api/embeddings -d '{
-	"model": "nomic-embed-text",
-	"prompt": "Explain RAG in one sentence."
+  "model": "nomic-embed-text",
+  "prompt": "Explain RAG in one sentence."
 }'
 ```
 
@@ -171,23 +418,46 @@ dotnet restore src/LLMChat.Api/LLMChat.Api.csproj
 dotnet run --project src/LLMChat.Api/LLMChat.Api.csproj
 ```
 
-Then open `http://localhost:5166/swagger` or call the endpoints directly.
+Then open the Swagger UI or call the endpoints directly.
+
+### 4. SQLite persistence
+
+The application uses SQLite for vector persistence, with `VectorDbContext` configured against `vectors.db`.
+
+The database stores chunk metadata and JSON-serialized embedding arrays. The current project uses EF Core for persistence and supports restartable local retrieval across application restarts.
+
+## Technology Summary
+
+This project demonstrates several core engineering patterns:
+
+- Dependency injection and service abstractions
+- `HttpClient` integration for Ollama endpoints
+- Local LLM generation with Qwen
+- Embedding generation with `nomic-embed-text`
+- Semantic retrieval using cosine similarity
+- Character-based chunking with overlap
+- SQLite persistence with EF Core
+- Retrieval filtering and relevance validation
+- Structured observability and latency tracking
+- Prototype RAG architecture for learning and portfolio demonstration
+
+## Scope
+
+This project intentionally keeps the implementation small, local, and educational. It is a learning-focused portfolio project designed to make the mechanics of a local Ollama-backed RAG API understandable before introducing more advanced retrieval, evaluation, reranking, and production-scale architecture.
 
 ## Future Roadmap
 
-The following capabilities are planned learning milestones and are not implemented in the current project:
+The following capabilities are planned learning milestones and are not implemented as production-grade architecture in the current codebase:
 
-- SQLite persistence for documents and vectors
-- Document chunking
-- Metadata filtering
+- Managed production vector database integration
+- Native database vector indexing
+- Advanced metadata filtering and ranking
 - Source citations in generated answers
-- Retrieval and answer evaluation
+- Retrieval and answer evaluation frameworks
 - Streaming responses
 - Tool and function calling
 - AI agent orchestration
 - Azure OpenAI integration
 - Azure AI Search integration
 
-## Scope
-
-This project intentionally keeps the current implementation small and local. It is a learning and portfolio project focused on understanding the mechanics of an Ollama-backed RAG API before introducing durable storage, production-scale retrieval, and hosted model services.
+These remain future improvements rather than current implementation claims.
