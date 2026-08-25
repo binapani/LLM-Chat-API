@@ -2,5 +2,8 @@ namespace LLMChat.Api.Services;
 
 public interface IDocumentIngestionService
 {
-    Task IngestAsync(IEnumerable<(string Source, string Content)> documents);
+    Task IngestAsync(
+        IEnumerable<(string Source, string Content)> documents,
+        Guid? documentId = null,
+        CancellationToken cancellationToken = default);
 }

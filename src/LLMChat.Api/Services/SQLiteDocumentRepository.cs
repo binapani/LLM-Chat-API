@@ -58,6 +58,9 @@ public class SQLiteDocumentRepository : IDocumentRepository
         Guid id,
         CancellationToken cancellationToken = default)
     {
+        await using var transaction = await _dbContext.Database
+            .BeginTransactionAsync(cancellationToken);
+
         var entity = await _dbContext.Set<DocumentEntity>()
             .FindAsync(new object[] { id }, cancellationToken);
 
@@ -66,8 +69,14 @@ public class SQLiteDocumentRepository : IDocumentRepository
             return false;
         }
 
+        var documentId = id.ToString();
+        await _dbContext.DocumentVectors
+            .Where(vector => vector.DocumentId == documentId)
+            .ExecuteDeleteAsync(cancellationToken);
+
         _dbContext.Set<DocumentEntity>().Remove(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return true;
     }

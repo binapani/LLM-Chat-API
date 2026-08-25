@@ -22,6 +22,14 @@ public class DocumentsController : ControllerBase
         _documentRepository = documentRepository;
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    {
+        var documents = await _documentRepository.GetAllAsync(cancellationToken);
+
+        return Ok(documents);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(
         Guid id,
@@ -30,6 +38,16 @@ public class DocumentsController : ControllerBase
         var document = await _documentRepository.GetByIdAsync(id, cancellationToken);
 
         return document is null ? NotFound() : Ok(document);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var deleted = await _documentRepository.DeleteAsync(id, cancellationToken);
+
+        return deleted ? NoContent() : NotFound();
     }
 
     [HttpPost("upload")]
@@ -72,7 +90,9 @@ public class DocumentsController : ControllerBase
         }
 
         await _documentIngestionService.IngestAsync(
-            new[] { (file.FileName, extractedText) });
+            new[] { (file.FileName, extractedText) },
+            metadata.Id,
+            cancellationToken);
 
         await _documentRepository.AddAsync(
             metadata,
