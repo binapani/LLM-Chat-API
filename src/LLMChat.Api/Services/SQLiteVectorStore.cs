@@ -29,6 +29,32 @@ public class SQLiteVectorStore : IVectorStore
         await _dbContext.SaveChangesAsync();
     }
 
+    public async Task ReplaceAsync(
+        string documentId,
+        IReadOnlyList<DocumentVector> documents,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database
+            .BeginTransactionAsync(cancellationToken);
+
+        await _dbContext.DocumentVectors
+            .Where(vector => vector.DocumentId == documentId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        var entities = documents.Select(document => new DocumentVectorEntity
+        {
+            DocumentId = documentId,
+            ChunkId = document.ChunkId,
+            Source = document.Source,
+            Content = document.Content,
+            Embedding = document.Embedding
+        });
+
+        await _dbContext.DocumentVectors.AddRangeAsync(entities, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<VectorSearchResult>> SearchAsync(float[] queryEmbedding, int topK)
     {
         var entities = await _dbContext.DocumentVectors

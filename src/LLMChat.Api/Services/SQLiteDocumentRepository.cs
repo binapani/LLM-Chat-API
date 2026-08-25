@@ -24,7 +24,8 @@ public class SQLiteDocumentRepository : IDocumentRepository
             FileName = document.FileName,
             ContentType = document.ContentType,
             UploadedAtUtc = document.UploadedAtUtc,
-            Source = document.Source
+            Source = document.Source,
+            Content = document.Content
         };
 
         await _dbContext.Set<DocumentEntity>()
@@ -52,6 +53,29 @@ public class SQLiteDocumentRepository : IDocumentRepository
             .ToListAsync(cancellationToken);
 
         return entities.Select(ToMetadata).ToList();
+    }
+
+    public async Task<DocumentMetadata?> UpdateAsync(
+        DocumentMetadata document,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Set<DocumentEntity>()
+            .FirstOrDefaultAsync(existingDocument => existingDocument.Id == document.Id, cancellationToken);
+
+        if (entity is null)
+        {
+            return null;
+        }
+
+        entity.FileName = document.FileName;
+        entity.ContentType = document.ContentType;
+        entity.UploadedAtUtc = document.UploadedAtUtc;
+        entity.Source = document.Source;
+        entity.Content = document.Content;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return ToMetadata(entity);
     }
 
     public async Task<bool> DeleteAsync(
@@ -89,7 +113,8 @@ public class SQLiteDocumentRepository : IDocumentRepository
             FileName = entity.FileName,
             ContentType = entity.ContentType,
             UploadedAtUtc = entity.UploadedAtUtc,
-            Source = entity.Source
+            Source = entity.Source,
+            Content = entity.Content
         };
     }
 }

@@ -6,4 +6,10 @@ public interface IDocumentIngestionService
         IEnumerable<(string Source, string Content)> documents,
         Guid? documentId = null,
         CancellationToken cancellationToken = default);
+
+    Task ReindexAsync(
+        Guid documentId,
+        string source,
+        string content,
+        CancellationToken cancellationToken = default);
 }

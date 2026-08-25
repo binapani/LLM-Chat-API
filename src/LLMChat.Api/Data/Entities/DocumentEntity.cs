@@ -22,4 +22,8 @@ public class DocumentEntity
     [Required]
     [MaxLength(512)]
     public string Source { get; set; } = string.Empty;
+
+    [Required]
+    [Column(TypeName = "TEXT")]
+    public string Content { get; set; } = string.Empty;
 }

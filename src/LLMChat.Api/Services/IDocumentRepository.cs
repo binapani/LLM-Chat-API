@@ -15,6 +15,10 @@ public interface IDocumentRepository
     Task<IReadOnlyList<DocumentMetadata>> GetAllAsync(
         CancellationToken cancellationToken = default);
 
+    Task<DocumentMetadata?> UpdateAsync(
+        DocumentMetadata document,
+        CancellationToken cancellationToken = default);
+
     Task<bool> DeleteAsync(
         Guid id,
         CancellationToken cancellationToken = default);

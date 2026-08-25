@@ -11,4 +11,6 @@ public class DocumentMetadata
     public DateTime UploadedAtUtc { get; set; }
 
     public string Source { get; set; } = string.Empty;
+
+    public string Content { get; set; } = string.Empty;
 }

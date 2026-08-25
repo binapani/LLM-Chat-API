@@ -12,6 +12,17 @@ public class InMemoryVectorStore : IVectorStore
         return Task.CompletedTask;
     }
 
+    public Task ReplaceAsync(
+        string documentId,
+        IReadOnlyList<DocumentVector> documents,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _documents.RemoveAll(document => document.DocumentId == documentId);
+        _documents.AddRange(documents);
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(float[] queryEmbedding, int topK)
     {
         var results = _documents

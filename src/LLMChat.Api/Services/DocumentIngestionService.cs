@@ -48,4 +48,39 @@ public class DocumentIngestionService : IDocumentIngestionService
             }
         }
     }
+
+    public async Task ReindexAsync(
+        Guid documentId,
+        string source,
+        string content,
+        CancellationToken cancellationToken = default)
+    {
+        var vectorDocumentId = documentId.ToString();
+        var normalizedSource = string.IsNullOrWhiteSpace(source) ? "unknown" : source;
+        var chunks = _documentChunker.Chunk(content, 500, 50);
+        var documents = new List<DocumentVector>();
+        var chunkIndex = 0;
+
+        foreach (var chunk in chunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var embedding = await _embeddingService.GenerateEmbeddingAsync(chunk);
+
+            documents.Add(new DocumentVector
+            {
+                DocumentId = vectorDocumentId,
+                ChunkId = chunkIndex,
+                Content = chunk,
+                Embedding = embedding,
+                Source = normalizedSource
+            });
+
+            chunkIndex++;
+        }
+
+        await _vectorStore.ReplaceAsync(
+            vectorDocumentId,
+            documents,
+            cancellationToken);
+    }
 }
