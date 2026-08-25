@@ -1,3 +1,4 @@
+using LLMChat.Api.Models;
 using LLMChat.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -33,6 +34,15 @@ public class DocumentsController : ControllerBase
             return BadRequest("File is empty.");
         }
 
+        var metadata = new DocumentMetadata
+        {
+            Id = Guid.NewGuid(),
+            FileName = file.FileName,
+            ContentType = file.ContentType ?? "application/octet-stream",
+            UploadedAtUtc = DateTime.UtcNow,
+            Source = "Upload"
+        };
+
         var extractor = await _documentTextExtractorResolver.ResolveAsync(
             file.FileName,
             cancellationToken);
@@ -53,7 +63,11 @@ public class DocumentsController : ControllerBase
 
         return Ok(new
         {
-            fileName = file.FileName,
+            documentId = metadata.Id,
+            fileName = metadata.FileName,
+            contentType = metadata.ContentType,
+            uploadedAtUtc = metadata.UploadedAtUtc,
+            source = metadata.Source,
             message = "Document uploaded and ingested successfully.",
             extractedCharacterCount = extractedText.Length
         });

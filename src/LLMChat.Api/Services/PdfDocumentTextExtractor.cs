@@ -30,7 +30,7 @@ public class PdfDocumentTextExtractor : IDocumentTextExtractor
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            using var pdfDocument = PdfDocument.Open(fileStream, leaveStreamOpen: true);
+            using var pdfDocument = PdfDocument.Open(fileStream, new ParsingOptions());
             var pageTexts = new List<string>();
 
             foreach (var page in pdfDocument.GetPages())
