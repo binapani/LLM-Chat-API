@@ -191,7 +191,7 @@ How many days of annual leave do full-time employees receive?
 Result:
 
 ```text
-Full-time employees receive twenty days of annual leave per year.
+Full-time employees receive twenty-five days of annual leave per year.
 ```
 
 ### Test 2
@@ -747,7 +747,7 @@ The same annual-leave test document was successfully processed through:
 
 The DOCX test successfully returned:
 
-"Full-time employees receive twenty days of annual leave per year."
+"Full-time employees receive twenty-five days of annual leave per year."
 
 This confirms that different document formats can enter the same downstream ingestion and RAG pipeline.
 
@@ -852,7 +852,7 @@ Persisted metadata can be retrieved by document ID:
 
 `GET /api/Documents/{id}`
 
-Metadata persistence was verified by uploading `annual-leave-test.pdf` and successfully retrieving its metadata using document ID `05cdc94c-f7da-4058-b94f-9c8c549af677`.
+Metadata persistence was verified by uploading a PDF document and successfully retrieving its metadata by document ID using the document-management endpoints.
 
 The retrieved metadata included the document ID, file name, content type, upload timestamp, and source.
 
