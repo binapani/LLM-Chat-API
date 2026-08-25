@@ -12,6 +12,8 @@ public class VectorDbContext : DbContext
     {
     }
 
+    public DbSet<DocumentEntity> Documents { get; set; }
+
     public DbSet<DocumentVectorEntity> DocumentVectors => Set<DocumentVectorEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

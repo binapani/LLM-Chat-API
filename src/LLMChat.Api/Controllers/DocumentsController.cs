@@ -10,13 +10,26 @@ public class DocumentsController : ControllerBase
 {
     private readonly IDocumentTextExtractorResolver _documentTextExtractorResolver;
     private readonly IDocumentIngestionService _documentIngestionService;
+    private readonly IDocumentRepository _documentRepository;
 
     public DocumentsController(
         IDocumentTextExtractorResolver documentTextExtractorResolver,
-        IDocumentIngestionService documentIngestionService)
+        IDocumentIngestionService documentIngestionService,
+        IDocumentRepository documentRepository)
     {
         _documentTextExtractorResolver = documentTextExtractorResolver;
         _documentIngestionService = documentIngestionService;
+        _documentRepository = documentRepository;
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var document = await _documentRepository.GetByIdAsync(id, cancellationToken);
+
+        return document is null ? NotFound() : Ok(document);
     }
 
     [HttpPost("upload")]
@@ -60,6 +73,10 @@ public class DocumentsController : ControllerBase
 
         await _documentIngestionService.IngestAsync(
             new[] { (file.FileName, extractedText) });
+
+        await _documentRepository.AddAsync(
+            metadata,
+            cancellationToken);
 
         return Ok(new
         {
