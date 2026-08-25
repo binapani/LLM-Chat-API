@@ -635,12 +635,6 @@ The new architecture separates:
 
 This makes the system easier to extend with additional document formats later.
 
-### Current limitation
-
-PDF and DOCX extraction are not implemented yet.
-
-The current implementation intentionally starts with plain-text-compatible formats so the complete upload-to-RAG workflow can be validated before adding format-specific extraction libraries.
-
 ### Milestone Status
 
 Completed:
@@ -655,11 +649,13 @@ Completed:
 - RAG retrieval
 - Hybrid reranking
 - End-to-end file-to-answer validation
+- PDF extraction
+- DOCX extraction
+- Document metadata persistence
+- Document metadata retrieval
 
 Next planned milestone:
 
-- PDF/DOCX document extraction
-- Document metadata management
 - Better document lifecycle management
 
 ## Multi-Format Document Ingestion
@@ -773,7 +769,7 @@ Common ingestion pipeline
 
 This makes adding another format, such as a future document type, possible without redesigning the upload or RAG pipeline.
 
-### Current Status
+## Current Progress
 
 Completed:
 
@@ -790,21 +786,106 @@ Completed:
 - Hybrid reranking
 - RAG retrieval
 - End-to-end multi-format testing
+- Document metadata entity
+- SQLite document repository
+- Document metadata persistence
+- Document metadata retrieval
 
-### Next Milestone
+### Next Milestones
 
-Document Management & Metadata:
-
-- DocumentId
-- FileName
-- ContentType
-- UploadedAt
-- Source
-- Version
 - Document listing
 - Document deletion
+- Deleting associated vector chunks
 - Re-indexing
 - Duplicate detection
+- Document versioning
+
+## Document Metadata Persistence
+
+Document metadata is persisted separately from document content and vector data.
+
+### Metadata model
+
+The upload pipeline creates a `DocumentMetadata` record containing:
+
+- `Id`
+- `FileName`
+- `ContentType`
+- `UploadedAtUtc`
+- `Source`
+
+The metadata is mapped to `DocumentEntity` and persisted through `IDocumentRepository`, implemented by `SQLiteDocumentRepository` using `VectorDbContext`.
+
+### Metadata persistence flow
+
+```text
+DocumentsController
+    ↓
+IDocumentRepository
+    ↓
+SQLiteDocumentRepository
+    ↓
+VectorDbContext
+    ↓
+SQLite Documents table
+```
+
+Document content follows the existing ingestion path independently:
+
+```text
+Document Upload
+    ↓
+DocumentsController
+    ↓
+DocumentTextExtractorResolver
+    ↓
+Document Text Extraction
+    ↓
+DocumentIngestionService
+    ↓
+Vector Store / RAG
+```
+
+### Metadata retrieval
+
+Persisted metadata can be retrieved by document ID:
+
+`GET /api/Documents/{id}`
+
+Metadata persistence was verified by uploading `annual-leave-test.pdf` and successfully retrieving its metadata using document ID `05cdc94c-f7da-4058-b94f-9c8c549af677`.
+
+The retrieved metadata included the document ID, file name, content type, upload timestamp, and source.
+
+### Current database state
+
+SQLite is the current persistence database. The `vectors.db` database contains:
+
+- `DocumentVectors` for vector data and chunk metadata
+- `Documents` for document metadata
+- `__EFMigrationsHistory` for EF Core migration history
+
+The current migration history includes:
+
+- `20260823180115_InitialVectorStore`
+- `20260825043111_AddDocumentsTable`
+
+Document metadata persistence is implemented and verified, but the application remains a local portfolio prototype rather than production-grade document management.
+
+### Completed document management milestones
+
+- Document metadata entity
+- SQLite document repository
+- Document metadata persistence
+- Document metadata retrieval
+
+### Future document management milestones
+
+- Document listing
+- Document deletion
+- Deleting associated vector chunks
+- Re-indexing
+- Duplicate detection
+- Document versioning
 
 ## Future Roadmap
 
