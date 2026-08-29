@@ -149,4 +149,53 @@ User question:
 
         return finalAnswer;
     }
+    public async Task<string> RetrieveContextAsync(string question)
+{
+    var minimumSimilarity =
+        _configuration.GetValue<double>("Rag:MinimumSimilarity", 0.50);
+
+    var retrievalTopK =
+        _configuration.GetValue<int>("Rag:RetrievalTopK", 5);
+
+    var relevanceTopK =
+        _configuration.GetValue<int>("Rag:RelevanceTopK", 3);
+
+    var queryEmbedding =
+        await _embeddingService.GenerateEmbeddingAsync(question);
+
+    var retrievedCandidates =
+        await _vectorStore.SearchAsync(queryEmbedding, retrievalTopK);
+
+    var filteredCandidates = retrievedCandidates
+        .Where(candidate =>
+            candidate.Document != null &&
+            !string.IsNullOrWhiteSpace(candidate.Document.Content) &&
+            candidate.Similarity >= minimumSimilarity)
+        .OrderByDescending(candidate => candidate.Similarity)
+        .ToList();
+
+    if (filteredCandidates.Count == 0)
+    {
+        return "The information is not available in the provided documents.";
+    }
+
+    var rerankedCandidates =
+        await _reranker.RerankAsync(
+            question,
+            filteredCandidates,
+            relevanceTopK);
+
+    if (rerankedCandidates.Count == 0)
+    {
+        return "The information is not available in the provided documents.";
+    }
+
+    var context = string.Join(
+        Environment.NewLine + Environment.NewLine,
+        rerankedCandidates
+            .Take(relevanceTopK)
+            .Select(result => result.Result.Document.Content));
+
+    return context;
+}
 }

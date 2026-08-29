@@ -42,6 +42,14 @@ builder.Services.AddScoped<PdfDocumentTextExtractor>();
 builder.Services.AddScoped<DocxDocumentTextExtractor>();
 builder.Services.AddScoped<IDocumentTextExtractorResolver, DocumentTextExtractorResolver>();
 builder.Services.AddScoped<IDocumentRepository, SQLiteDocumentRepository>();
+builder.Services.AddScoped<ISearchKnowledgeBaseTool, SearchKnowledgeBaseTool>();
+builder.Services.AddScoped<ISearchKnowledgeBaseTool, SearchKnowledgeBaseTool>();
+builder.Services.AddHttpClient<OllamaAgentService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
+builder.Services.AddScoped<IAgentService, AgentService>();
+builder.Services.AddScoped<ICalculatorTool, CalculatorTool>();
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {

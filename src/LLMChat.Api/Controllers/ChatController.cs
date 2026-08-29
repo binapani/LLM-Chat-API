@@ -127,7 +127,19 @@ public async Task<IActionResult> IngestDocuments()
             Answer = answer
         });
     }
+[HttpPost("rag-context")]
+public async Task<ActionResult<string>> RetrieveRagContext(
+    [FromBody] ChatRequest request)
+{
+    if (!ModelState.IsValid)
+    {
+        return ValidationProblem(ModelState);
+    }
 
+    var context = await _ragService.RetrieveContextAsync(request.Message);
+
+    return Ok(context);
+}
     [HttpPost("evaluate-rag")]
     public async Task<ActionResult<IReadOnlyList<RAGEvaluationResult>>> EvaluateRag(
         [FromBody] IReadOnlyList<RAGEvaluationCase> cases)
@@ -141,4 +153,24 @@ public async Task<IActionResult> IngestDocuments()
 
         return Ok(results);
     }
+    [HttpPost("agent")]
+public async Task<ActionResult<ChatResponse>> Agent(
+    [FromBody] ChatRequest request,
+    [FromServices] IAgentService agentService,
+    CancellationToken cancellationToken)
+{
+    if (!ModelState.IsValid)
+    {
+        return ValidationProblem(ModelState);
+    }
+
+    var answer = await agentService.RunAsync(
+        request.Message,
+        cancellationToken);
+
+    return Ok(new ChatResponse
+    {
+        Answer = answer
+    });
+}
 }
