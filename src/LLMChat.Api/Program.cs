@@ -48,7 +48,7 @@ builder.Services.AddHttpClient<OllamaAgentService>(client =>
 {
     client.Timeout = TimeSpan.FromMinutes(3);
 });
-builder.Services.AddSingleton<IConversationMemoryService, ConversationMemoryService>();
+builder.Services.AddScoped<IConversationMemoryService, EfConversationMemoryService>();
 builder.Services.AddScoped<IAgentService, AgentService>();
 builder.Services.AddScoped<ICalculatorTool, CalculatorTool>();
 var app = builder.Build();
