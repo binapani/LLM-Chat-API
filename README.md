@@ -20,6 +20,536 @@ This project demonstrates a complete local RAG pipeline using:
 
 The API ingests document content, embeds it, stores the vectors in SQLite, retrieves the closest matches for a user question, validates candidate relevance, and sends only grounded context to Qwen for final answer generation.
 
+# AI Learning & Implementation Roadmap
+
+This project follows a practical learning path:
+
+Learn → Build → Test → Debug → Explain → Interview → Commit
+
+The goal is not to create a collection of disconnected AI demos. This is a progressive implementation of an enterprise AI system, where each concept is learned, built in code, validated with real prompts, and then explained from an engineering and interview perspective.
+
+## Phase 1 — LLM Fundamentals
+Status: COMPLETED
+
+Topics learned:
+- LLM fundamentals
+- Prompt engineering
+- System prompts
+- User prompts
+- Context
+- Ollama
+- Qwen 2.5:3b
+- Ollama /api/generate
+- Ollama /api/chat
+- Structured responses
+- Tool-call concepts
+
+## Phase 2 — RAG Fundamentals
+Status: COMPLETED — AGENTIC RAG FOUNDATION
+
+Implemented/learned:
+- Document ingestion
+- Text extraction
+- Chunking
+- Embeddings
+- nomic-embed-text
+- Vector storage
+- Query embeddings
+- Vector search
+- Similarity scoring
+- Top-K retrieval
+- Similarity threshold filtering
+- Reranking
+- Context augmentation
+- Grounded answer generation
+- Hallucination mitigation
+- RAG vs fine-tuning
+- Agentic RAG using search_knowledge_base
+
+Conceptual pipeline:
+
+```text
+Documents
+  ↓
+Text extraction
+  ↓
+Chunking
+  ↓
+Embeddings
+  ↓
+Vector storage
+  ↓
+User question
+  ↓
+Query embedding
+  ↓
+Vector search
+  ↓
+Similarity filtering
+  ↓
+Reranking
+  ↓
+Context
+  ↓
+LLM
+  ↓
+Answer
+```
+
+## Phase 3 — Retrieval Engineering
+Status: NEXT / IN PROGRESS
+
+Topics to learn and implement in this order:
+
+1. Keyword/BM25 search
+2. Dense/vector search vs sparse/keyword search
+3. Hybrid search
+4. Fixed-size chunking
+5. Semantic chunking
+6. Chunk overlap and chunk-size trade-offs
+7. Parent-child retrieval
+8. Metadata filtering
+9. Query rewriting
+10. Multi-query retrieval
+11. Query decomposition
+12. Context compression
+13. Lost-in-the-middle problem
+
+Principle:
+
+Dense retrieval → semantic meaning
+Sparse/BM25 → exact keyword matching
+Hybrid retrieval → combines both
+
+## Phase 4 — Agentic AI
+Status: COMPLETED — AGENT TOOLING AND ORCHESTRATION
+
+Implemented:
+- AgentService
+- OllamaAgentService
+- Agent tool definitions
+- Tool calling
+- Tool execution
+- search_knowledge_base
+- calculate
+- Agent loop
+- Maximum iteration guard
+- Tool orchestration
+- Parallel tool execution
+- Task.WhenAll
+- Tool validation
+- Unknown-tool handling
+- Error handling
+- Cancellation support
+- Logging/observability
+
+Architecture:
+
+```text
+User
+ ↓
+Agent / Qwen
+ ↓
+Tool selection
+ ├── search_knowledge_base
+ │       ↓
+ │      RAG
+ │
+ └── calculate
+         ↓
+      Calculator
+ ↓
+Tool results
+ ↓
+Qwen
+ ↓
+Final answer
+```
+
+Orchestration model:
+
+- Agent = decision maker
+- Tools = capabilities
+- Orchestration = coordinating the capabilities
+
+Important distinction:
+
+- Independent tools → can execute in parallel
+- Dependent tools → should execute sequentially
+
+## Phase 5 — Agent Memory
+Status: COMPLETED — SHORT-TERM + PERSISTENT CONVERSATION MEMORY
+
+Implemented:
+- IConversationMemoryService abstraction
+- ConversationMemoryService
+- EfConversationMemoryService
+- ConversationSessionEntity
+- ConversationMessageEntity
+- EF Core persistence
+- SQLite persistence
+- ConversationSessions table
+- ConversationMessages table
+- One-to-many session/message relationship
+- SessionId unique constraint/index
+- SequenceNumber for deterministic message ordering
+- ToolCallsJson persistence with System.Text.Json
+- Session isolation
+- GetMessagesAsync
+- AddMessagesAsync
+- ReplaceMessagesAsync
+- ClearAsync
+- Per-session conversation history
+- Database-backed conversation history
+- Conversation persistence across API restart
+- Memory logging
+
+Demonstrated:
+
+Session A:
+"My name is Alex."
+→ later:
+"What is my name?"
+→ "Your name is Alex."
+
+Session B:
+"What is my name?"
+→ does not know Alex from Session A.
+
+Persistence validation:
+- Same-session memory recall — PASSED
+- Different-session isolation — PASSED
+- Persistence after API restart — PASSED
+- RAG question — PASSED
+- Calculator question — PASSED
+- Multi-tool request using knowledge-base search + calculator — PASSED
+
+Key distinction:
+
+RAG:
+"What does the company know?"
+
+Conversation memory:
+"What happened earlier in this conversation?"
+
+```text
+User
+ ↓
+AgentService
+ ↓
+IConversationMemoryService
+ ↓
+EfConversationMemoryService
+ ↓
+VectorDbContext
+ ↓
+SQLite
+ ↓
+ConversationSessions
+ ↓
+ConversationMessages
+```
+
+Important: Long-term semantic memory, summarization, and persistent semantic memory remain future work and are not implemented here.
+
+## Phase 6 — Advanced RAG
+Status: PLANNED
+
+Topics:
+- CRAG
+- Self-RAG
+- Graph RAG
+- Multimodal RAG
+
+Do not claim these are implemented.
+
+## Phase 7 — Advanced Agentic AI
+Status: PLANNED
+
+Topics:
+- Agent planning
+- Reflection
+- Retry and recovery
+- Tool failure handling
+- Human-in-the-loop
+- Multi-agent systems
+- Agent evaluation
+- Agent guardrails
+
+Principle:
+Use multi-agent architecture only when it provides a real architectural benefit; do not introduce it just because it is a current AI trend.
+
+## Phase 8 — LLM Engineering
+Status: PLANNED
+
+Topics:
+- Structured output
+- JSON schema
+- Function calling
+- Streaming
+- Token management
+- Context windows
+- Prompt optimization
+- Temperature/top-p concepts
+- Caching
+- Semantic caching
+- Batch inference
+- Latency optimization
+
+## Phase 9 — AI / RAG Evaluation
+Status: PLANNED
+
+Topics:
+- RAG evaluation
+- Faithfulness
+- Answer relevance
+- Context relevance
+- Retrieval quality
+- RAGAS
+- TruLens
+- Ground-truth evaluation
+- LLM-as-judge
+- Retrieval metrics
+- Regression testing
+
+## Phase 10 — Enterprise AI Architecture
+Status: PLANNED
+
+Topics:
+- API gateway
+- Authentication
+- Authorization
+- RBAC
+- Multi-tenancy
+- Data isolation
+- Secrets management
+- PII/security considerations
+- Rate limiting
+- Observability
+- Cost management
+- Reliability
+- Disaster recovery
+
+Target architecture conceptually:
+
+```text
+Client
+ ↓
+API Gateway
+ ↓
+AI Application
+ ├── Agent
+ ├── RAG
+ ├── Memory
+ └── Tools
+ ↓
+LLM / Model layer
+ ↓
+Enterprise data/services
+```
+
+## Phase 11 — Azure AI
+Status: PLANNED
+
+Map the local implementation to Azure concepts:
+
+Ollama → Azure OpenAI
+Local vector store → Azure AI Search
+ASP.NET Core local API → Azure App Service
+Local secrets → Azure Key Vault
+Application logs → Application Insights
+Authentication → Microsoft Entra ID
+
+Also cover:
+- Enterprise Azure architecture
+- Security
+- Scalability
+- Monitoring
+- Cost
+
+Do not claim Azure migration has already been implemented.
+
+## Phase 12 — LLMOps / Production AI
+Status: PLANNED
+
+Topics:
+- Model/version management
+- Prompt versioning
+- Evaluation pipelines
+- CI/CD
+- Monitoring
+- Cost monitoring
+- Latency monitoring
+- Model drift
+- Feedback loops
+- Production incident handling
+- Continuous improvement
+
+# Current Implementation Status
+
+A concise implementation checklist:
+
+- LLM integration — COMPLETED
+- Ollama integration — COMPLETED
+- Qwen 2.5:3b — COMPLETED
+- nomic-embed-text — COMPLETED
+- LLM generation — COMPLETED
+- Embedding generation — COMPLETED
+- Document ingestion — COMPLETED
+- Chunking — COMPLETED
+- Vector storage — COMPLETED
+- Vector search — COMPLETED
+- Similarity filtering — COMPLETED
+- Relevance validation — COMPLETED
+- Hybrid reranking — COMPLETED
+- File upload — COMPLETED
+- TXT/MD/CSV extraction — COMPLETED
+- PDF extraction — COMPLETED
+- DOCX extraction — COMPLETED
+- Document metadata persistence — COMPLETED
+- RAG pipeline — COMPLETED
+- AgentService — COMPLETED
+- OllamaAgentService — COMPLETED
+- Tool definitions — COMPLETED
+- Tool calling — COMPLETED
+- search_knowledge_base — COMPLETED
+- calculate — COMPLETED
+- Agent loop — COMPLETED
+- Maximum iteration guard — COMPLETED
+- Tool validation — COMPLETED
+- Unknown-tool handling — COMPLETED
+- Error handling — COMPLETED
+- Cancellation — COMPLETED
+- Logging/observability — COMPLETED
+- Multi-tool orchestration — COMPLETED
+- Parallel tool execution — COMPLETED
+- Session-based conversation memory — COMPLETED
+- Session isolation — COMPLETED
+- Per-session synchronization — COMPLETED
+- Conversation history passed to the agent — COMPLETED
+- Persistent Conversation Memory — COMPLETED
+- Database-backed conversation history — COMPLETED
+- Conversation persistence across API restart — COMPLETED
+- BM25 — NEXT
+- Hybrid search — NEXT
+- Persistent semantic/long-term memory — PLANNED
+- Conversation summarization — PLANNED
+- Advanced RAG — PLANNED
+- Multi-agent systems — PLANNED
+- RAGAS — PLANNED
+- LLM evaluation — PLANNED
+- Azure OpenAI — PLANNED
+- Azure AI Search — PLANNED
+- LLMOps — PLANNED
+
+## Persistent Conversation Memory — COMPLETED
+
+Implemented:
+- IConversationMemoryService abstraction
+- EfConversationMemoryService
+- ConversationSessionEntity
+- ConversationMessageEntity
+- EF Core persistence
+- SQLite persistence
+- ConversationSessions table
+- ConversationMessages table
+- One-to-many session/message relationship
+- SessionId unique constraint/index
+- SequenceNumber for deterministic message ordering
+- ToolCallsJson persistence using System.Text.Json
+- Session isolation
+- GetMessagesAsync
+- AddMessagesAsync
+- ReplaceMessagesAsync
+- ClearAsync
+- Database-backed conversation history
+- Conversation persistence across API restart
+
+Architecture:
+
+```text
+User
+ ↓
+AgentService
+ ↓
+IConversationMemoryService
+ ↓
+EfConversationMemoryService
+ ↓
+VectorDbContext
+ ↓
+SQLite
+ ↓
+ConversationSessions
+ ↓
+ConversationMessages
+```
+
+Validated tests:
+1. Same-session memory recall — PASSED
+2. Different-session isolation — PASSED
+3. Persistence after API restart — PASSED
+4. RAG question — PASSED
+5. Calculator question — PASSED
+6. Multi-tool request using knowledge-base search + calculator — PASSED
+
+# Learning Philosophy
+
+This project is intentionally implementation-driven. Each AI concept is first understood conceptually, then implemented in C#, tested with real requests, debugged using logs, reviewed from an architecture perspective, and converted into an interview-ready explanation.
+
+The objective is not only to use AI frameworks but to understand:
+- why a component exists
+- when to use it
+- when not to use it
+- trade-offs
+- failure modes
+- scalability
+- latency
+- security
+- production considerations
+
+# Interview Preparation
+
+Every major implementation in this project is also used to prepare for Senior GenAI / AI Architect interviews.
+
+Example questions:
+
+- Explain the end-to-end RAG workflow.
+- RAG vs fine-tuning?
+- Dense vs sparse vs hybrid retrieval?
+- How do you choose chunk size?
+- What is reranking?
+- How do you reduce RAG latency?
+- What is agent orchestration?
+- How does tool calling work?
+- How do you safely execute multiple tools in parallel?
+- How do you implement conversation memory?
+- How do you isolate memory between users?
+- How would you make memory persistent?
+- How do you prevent hallucinations?
+- How do you evaluate RAG quality?
+- How would you design this system for Azure?
+
+# Current Next Step
+
+Retrieval Engineering — BM25 and Hybrid Search
+
+We currently rely primarily on dense/vector retrieval. The next milestone is to understand sparse keyword retrieval using BM25 and then combine dense + sparse retrieval into hybrid search.
+
+```text
+Dense Retrieval
+      ↓
+BM25 / Sparse Retrieval
+      ↓
+Hybrid Retrieval
+      ↓
+Reranking
+      ↓
+High-quality enterprise retrieval
+```
+
+This is the next learning step for improving retrieval quality before moving further into more advanced RAG and agent capabilities.
+
 ## Current Architecture
 
 ```text
@@ -377,7 +907,7 @@ No Context     Final Qwen
 
 This future experiment would test whether a lightweight confidence gate can separate clearly answerable questions from unanswerable ones before the final generation stage. It is intentionally a future milestone and not a production claim.
 
-## Next Milestone — Reranking
+## Historical Reranking Milestone
 
 The current relevance-validation approach uses a generative LLM multiple times and is therefore expensive. This remains a valid prototype design, but it is not the most efficient production approach.
 
@@ -403,13 +933,13 @@ Relevant candidates
 Final Qwen
 ```
 
-This is the next milestone. The concepts are:
+This was an earlier milestone in the project learning path and helped validate the value of a lightweight reranking stage. It is not the current next milestone. The concepts are:
 
 - Retriever = finds possible candidates
 - Reranker = determines which candidates are most relevant
 - Generator = produces the final answer
 
-This will be investigated as a future improvement, but it is not implemented in the current codebase and is clearly marked as the next milestone.
+This was explored as a learning step and remains a useful historical reference, but the active next milestone is retrieval engineering focused on BM25 and hybrid search.
 
 ## API Endpoints
 
@@ -889,17 +1419,18 @@ Document metadata persistence is implemented and verified, but the application r
 
 ## Future Roadmap
 
-The following capabilities are planned learning milestones and are not implemented as production-grade architecture in the current codebase:
+The following capabilities remain future or planned work and are not yet implemented as production-grade architecture in the current codebase:
 
 - Managed production vector database integration
 - Native database vector indexing
 - Advanced metadata filtering and ranking
 - Source citations in generated answers
-- Retrieval and answer evaluation frameworks
+- Evaluation frameworks
 - Streaming responses
-- Tool and function calling
-- AI agent orchestration
 - Azure OpenAI integration
-- Azure AI Search integration
+- Long-term semantic memory
+- Advanced RAG
+- Advanced agentic AI
+- LLMOps
 
 These remain future improvements rather than current implementation claims.
