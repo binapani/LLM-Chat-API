@@ -5,73 +5,98 @@ namespace LLMChat.Api.Services;
 
 public class AgentService : IAgentService
 {
+    private const string SystemPrompt = """
+        You are a helpful enterprise AI assistant.
+
+        Follow this priority order:
+
+        1. CONVERSATION MEMORY
+           Previous messages in the current session are trusted conversation context.
+           Use this context to answer questions about information the user previously provided,
+           such as their name, preferences, goals, or earlier discussion.
+           If the answer is already in the conversation history, respond from that information.
+           Do not treat personal information from conversation history as company knowledge.
+
+        2. search_knowledge_base
+           Use this only when the user asks for company-specific or internal information
+           that should come from the company's knowledge base.
+           This is not for personal facts already provided in the conversation.
+           If the information is already available in the current session memory, do not call
+           the knowledge-base tool.
+
+        3. calculate
+           Use this for mathematical calculations.
+
+        Guidelines:
+        - Answer from conversation memory when it directly addresses the user's question.
+        - Do not call search_knowledge_base for information already contained in the conversation.
+        - Do not invent company-specific information.
+        - If the knowledge base does not contain the requested company information, say that the
+          information is not available.
+        - Keep the final response natural, concise, and conversational.
+        - Do not mention internal tools, tool names, agent iterations, or retrieval mechanics in the
+          final response unless the user explicitly asks.
+        """;
+
     private readonly OllamaAgentService _ollamaAgentService;
     private readonly ISearchKnowledgeBaseTool _searchTool;
     private readonly ICalculatorTool _calculatorTool;
+    private readonly IConversationMemoryService _conversationMemoryService;
     private readonly ILogger<AgentService> _logger;
 
     public AgentService(
         OllamaAgentService ollamaAgentService,
         ISearchKnowledgeBaseTool searchTool,
         ICalculatorTool calculatorTool,
+        IConversationMemoryService conversationMemoryService,
         ILogger<AgentService> logger)
     {
         _ollamaAgentService = ollamaAgentService;
         _searchTool = searchTool;
         _calculatorTool = calculatorTool;
+        _conversationMemoryService = conversationMemoryService;
         _logger = logger;
     }
 
     public async Task<string> RunAsync(
+        string sessionId,
         string userMessage,
         CancellationToken cancellationToken)
     {
         const int maxIterations = 5;
+
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            throw new ArgumentException("Session ID is required.", nameof(sessionId));
+        }
+
+        var previousMessages = (await _conversationMemoryService.GetMessagesAsync(sessionId)).ToList();
+        _logger.LogInformation(
+            "Session {SessionId}: {PreviousMessageCount} previous messages loaded.",
+            sessionId,
+            previousMessages.Count);
+
+        var sessionMessages = new List<OllamaMessage>(previousMessages);
+        sessionMessages.Add(new OllamaMessage
+        {
+            Role = "user",
+            Content = userMessage
+        });
 
         var messages = new List<OllamaMessage>
         {
             new OllamaMessage
             {
                 Role = "system",
-                Content = """
-          You are an enterprise AI assistant.
-
-          You have access to two tools:
-
-          1. search_knowledge_base
-             Use this for company-specific information
-             contained in internal documents.
-
-          2. calculate
-             Use this for mathematical calculations.
-
-          Decide which tool or tools are required to answer
-          the user's question.
-
-          Company information returned by search_knowledge_base
-          is the authoritative source for company-specific facts.
-
-          After receiving tool results, use the information
-          contained in those results to answer the user.
-
-          Do not claim that information is unavailable if the
-          search tool returned evidence that answers the question.
-
-          Do not invent company-specific information.
-
-          If the available tool results do not contain the
-          requested company information, clearly say that the
-          information is not available.
-
-          Provide a concise final answer.
-          """
-            },
-            new OllamaMessage
-            {
-                Role = "user",
-                Content = userMessage
+                Content = SystemPrompt
             }
         };
+        messages.AddRange(previousMessages);
+        messages.Add(new OllamaMessage
+        {
+            Role = "user",
+            Content = userMessage
+        });
 
         var tools = new List<OllamaTool>
         {
@@ -82,7 +107,8 @@ public class AgentService : IAgentService
         for (var iteration = 0; iteration < maxIterations; iteration++)
         {
             _logger.LogInformation(
-                "Agent iteration {Iteration} started.",
+                "Session {SessionId}: agent iteration {Iteration} started.",
+                sessionId,
                 iteration + 1);
 
             var response = await _ollamaAgentService.ChatAsync(
@@ -95,13 +121,16 @@ public class AgentService : IAgentService
             if (toolCalls == null || toolCalls.Count == 0)
             {
                 _logger.LogInformation(
-                    "Agent completed on iteration {Iteration}.",
+                    "Session {SessionId}: agent completed on iteration {Iteration}.",
+                    sessionId,
                     iteration + 1);
 
+                sessionMessages.Add(response.Message);
+                await SaveSessionMessagesAsync(sessionId, sessionMessages, cancellationToken);
                 return response.Message.Content;
             }
 
-            // Preserve the assistant's tool-call message.
+            sessionMessages.Add(response.Message);
             messages.Add(response.Message);
 
             var toolResults = await Task.WhenAll(
@@ -111,7 +140,8 @@ public class AgentService : IAgentService
                     var stopwatch = Stopwatch.StartNew();
 
                     _logger.LogInformation(
-                        "Agent selected tool {ToolName}.",
+                        "Session {SessionId}: agent selected tool {ToolName}.",
+                        sessionId,
                         toolName);
 
                     try
@@ -119,7 +149,8 @@ public class AgentService : IAgentService
                         cancellationToken.ThrowIfCancellationRequested();
 
                         _logger.LogInformation(
-                            "Tool execution started for {ToolName}.",
+                            "Session {SessionId}: tool execution started for {ToolName}.",
+                            sessionId,
                             toolName);
 
                         var result = await ExecuteToolAsync(
@@ -129,7 +160,8 @@ public class AgentService : IAgentService
                         stopwatch.Stop();
 
                         _logger.LogInformation(
-                            "Tool {ToolName} completed successfully in {DurationMs}ms.",
+                            "Session {SessionId}: tool {ToolName} completed successfully in {DurationMs}ms.",
+                            sessionId,
                             toolName,
                             stopwatch.ElapsedMilliseconds);
 
@@ -144,7 +176,8 @@ public class AgentService : IAgentService
                         stopwatch.Stop();
 
                         _logger.LogWarning(
-                            "Tool {ToolName} was cancelled after {DurationMs}ms.",
+                            "Session {SessionId}: tool {ToolName} was cancelled after {DurationMs}ms.",
+                            sessionId,
                             toolName,
                             stopwatch.ElapsedMilliseconds);
 
@@ -156,7 +189,8 @@ public class AgentService : IAgentService
 
                         _logger.LogError(
                             ex,
-                            "Tool {ToolName} failed after {DurationMs}ms.",
+                            "Session {SessionId}: tool {ToolName} failed after {DurationMs}ms.",
+                            sessionId,
                             toolName,
                             stopwatch.ElapsedMilliseconds);
 
@@ -168,14 +202,34 @@ public class AgentService : IAgentService
                     }
                 }));
 
+            sessionMessages.AddRange(toolResults);
             messages.AddRange(toolResults);
         }
 
         _logger.LogWarning(
-            "Agent reached maximum iteration limit of {MaxIterations}.",
+            "Session {SessionId}: agent reached maximum iteration limit of {MaxIterations}.",
+            sessionId,
             maxIterations);
 
+        await SaveSessionMessagesAsync(sessionId, sessionMessages, cancellationToken);
         return "The agent reached the maximum number of reasoning steps without producing a final answer.";
+    }
+
+    private async Task SaveSessionMessagesAsync(
+        string sessionId,
+        List<OllamaMessage> sessionMessages,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await _conversationMemoryService.ReplaceMessagesAsync(
+            sessionId,
+            sessionMessages);
+
+        _logger.LogInformation(
+            "Session {SessionId}: conversation memory saved with {MessageCount} messages.",
+            sessionId,
+            sessionMessages.Count);
     }
 
     private async Task<string> ExecuteToolAsync(

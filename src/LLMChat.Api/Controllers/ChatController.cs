@@ -154,23 +154,29 @@ public async Task<ActionResult<string>> RetrieveRagContext(
         return Ok(results);
     }
     [HttpPost("agent")]
-public async Task<ActionResult<ChatResponse>> Agent(
-    [FromBody] ChatRequest request,
-    [FromServices] IAgentService agentService,
-    CancellationToken cancellationToken)
-{
-    if (!ModelState.IsValid)
+    public async Task<ActionResult<ChatResponse>> Agent(
+        [FromBody] ChatRequest request,
+        [FromServices] IAgentService agentService,
+        CancellationToken cancellationToken)
     {
-        return ValidationProblem(ModelState);
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var sessionId = string.IsNullOrWhiteSpace(request.SessionId)
+            ? Guid.NewGuid().ToString()
+            : request.SessionId;
+
+        var answer = await agentService.RunAsync(
+            sessionId,
+            request.Message,
+            cancellationToken);
+
+        return Ok(new ChatResponse
+        {
+            SessionId = sessionId,
+            Answer = answer
+        });
     }
-
-    var answer = await agentService.RunAsync(
-        request.Message,
-        cancellationToken);
-
-    return Ok(new ChatResponse
-    {
-        Answer = answer
-    });
-}
 }
