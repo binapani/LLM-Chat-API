@@ -1434,3 +1434,128 @@ The following capabilities remain future or planned work and are not yet impleme
 - LLMOps
 
 These remain future improvements rather than current implementation claims.
+
+## BM25 Retrieval — COMPLETED
+
+The BM25 implementation is now in place and verified.
+
+### Implemented components
+
+- IBm25SearchService
+- SQLiteBm25SearchService
+- SQLite FTS5 virtual table support
+- DocumentChunksFts table
+- BM25 indexing initialization
+- Backfill from existing DocumentVectors rows into the FTS5 table
+- Chunk-level indexing during ingestion and document rebuilds
+- Document reindexing support for replaced documents
+- BM25 SearchAsync implementation
+- Query normalization for FTS5 compatibility
+- SQLite bm25() score ranking
+
+### FTS5 and BM25 behavior
+
+This implementation separates two distinct concepts:
+
+- FTS5 full-text indexing: SQLite builds a searchable inverted index for text content.
+- BM25 ranking: SQLite calculates a relevance score for matching rows using the bm25() function.
+
+In other words, the FTS5 table makes keyword matching possible, while bm25() is what ranks the matching rows by relevance. The index is not the same thing as the ranking formula, and they were both validated during the BM25 debugging work.
+
+### DocumentChunksFts
+
+The BM25 pipeline indexes the chunk metadata and content in a dedicated SQLite FTS5 table named DocumentChunksFts.
+
+The indexed columns include:
+
+- ChunkId
+- DocumentId
+- Source
+- Content
+
+This allows the API to perform keyword-first retrieval over stored document chunks without depending only on dense vector similarity.
+
+### BM25 indexing and maintenance
+
+The current implementation includes:
+
+- InitializeAsync() to create the FTS5 table when needed
+- BackfillAsync() to populate the index from the existing DocumentVectors data
+- IndexChunkAsync() for adding a single indexed chunk
+- ReindexDocumentAsync() to delete and rebuild the index for a document's chunks
+
+This was implemented to keep the BM25 search index aligned with the vector storage data and to support normal document reprocessing.
+
+### BM25 SearchAsync and query normalization
+
+The BM25 query path includes:
+
+- validation for blank or invalid queries
+- query normalization to reduce whitespace issues
+- a SQLite MATCH query against DocumentChunksFts
+- ORDER BY bm25(DocumentChunksFts) DESC
+- LIMIT topK results
+
+The normalization step was part of the debugging work because queries containing punctuation or hyphenated wording can behave differently in SQLite FTS5 than a human would expect. The implementation therefore trims and normalizes the incoming query before executing the search.
+
+### API endpoint
+
+The BM25 endpoint is:
+
+- POST /api/chat/bm25-search
+
+This endpoint accepts a search request, executes the BM25 query, and returns the ranked chunks with metadata and score information.
+
+### Verified BM25 tests and debugging
+
+The actual BM25 validation used the SQLite FTS5 table directly and through the API endpoint. The tested queries included:
+
+- annual
+- leave
+- employees
+- full
+- time
+- annual leave
+- full employees
+- full time employees
+- full-time
+- "annual leave"
+- "full-time employees annual leave"
+- full-time employees annual leave
+
+The diagnostic checks confirmed:
+
+- the DocumentChunksFts schema exists
+- the table contains indexed rows
+- vocabulary entries are being built as expected
+- SQLite MATCH returns rows for policy-related terms
+- bm25(DocumentChunksFts) produces ranking scores for returned results
+- query behavior varies depending on tokenization and phrase structure
+
+### PolicyFull-time indexing discovery
+
+One important debugging discovery was the behavior of hyphenated terms in the FTS5 index. The index and query behavior for full-time did not always match a naive expectation that a hyphenated term would behave like a single literal string. This was validated by querying the FTS5 table directly and inspecting both the match count and the returned ranked rows.
+
+That debugging step was important because it showed that FTS5 indexing and BM25 ranking must be validated against the real SQLite index behavior rather than assumed from standard keyword-search intuition.
+
+### Dense/vector vs sparse/BM25 retrieval
+
+This project now clearly distinguishes the two retrieval modes:
+
+- Dense/vector retrieval: semantic similarity using embeddings and cosine similarity
+- Sparse/BM25 retrieval: lexical keyword matching using SQLite FTS5 and bm25() ranking
+
+These are different retrieval mechanisms with different strengths:
+
+- Dense retrieval is good for semantic meaning and paraphrased intent.
+- Sparse/BM25 retrieval is good for exact or near-exact keyword matching.
+
+The BM25 implementation is therefore a real retrieval layer in its own right, not just a diagnostic pass.
+
+### Current next implementation
+
+Hybrid Search is the NEXT implementation:
+
+Vector Search + BM25 → candidate fusion → reranking → RAG
+
+This is the next step in the retrieval stack, where dense and sparse signals are combined before the final reranking and grounded generation stages.

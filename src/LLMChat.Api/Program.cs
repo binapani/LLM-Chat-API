@@ -31,6 +31,7 @@ builder.Services.AddHttpClient<ILLMService, LLMService>(client =>
 });
 builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>();
 builder.Services.AddScoped<IVectorStore, SQLiteVectorStore>();
+builder.Services.AddScoped<IBm25SearchService, SQLiteBm25SearchService>();
 builder.Services.AddScoped<IDocumentIngestionService, DocumentIngestionService>();
 builder.Services.AddSingleton<IDocumentChunker, DocumentChunker>();
 builder.Services.AddScoped<IRAGService, RAGService>();
@@ -43,7 +44,6 @@ builder.Services.AddScoped<DocxDocumentTextExtractor>();
 builder.Services.AddScoped<IDocumentTextExtractorResolver, DocumentTextExtractorResolver>();
 builder.Services.AddScoped<IDocumentRepository, SQLiteDocumentRepository>();
 builder.Services.AddScoped<ISearchKnowledgeBaseTool, SearchKnowledgeBaseTool>();
-builder.Services.AddScoped<ISearchKnowledgeBaseTool, SearchKnowledgeBaseTool>();
 builder.Services.AddHttpClient<OllamaAgentService>(client =>
 {
     client.Timeout = TimeSpan.FromMinutes(3);
@@ -55,6 +55,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<VectorDbContext>();
+    var bm25SearchService = scope.ServiceProvider.GetRequiredService<IBm25SearchService>();
     var connection = dbContext.Database.GetDbConnection();
 
     Console.WriteLine("=== SQLITE RUNTIME DIAGNOSTIC ===");
@@ -79,6 +80,10 @@ using (var scope = app.Services.CreateScope())
     }
 
     Console.WriteLine("=================================");
+
+    await bm25SearchService.InitializeAsync();
+    await bm25SearchService.BackfillAsync();
+    Console.WriteLine("BM25 FTS5 index initialized and backfilled.");
 }
 if (app.Environment.IsDevelopment())
 {
