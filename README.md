@@ -97,23 +97,23 @@ Answer
 ```
 
 ## Phase 3 — Retrieval Engineering
-Status: NEXT / IN PROGRESS
+Status: IN PROGRESS — BM25 + HYBRID SEARCH IMPLEMENTED
 
-Topics to learn and implement in this order:
+Topics completed or in progress:
 
-1. Keyword/BM25 search
-2. Dense/vector search vs sparse/keyword search
-3. Hybrid search
-4. Fixed-size chunking
-5. Semantic chunking
-6. Chunk overlap and chunk-size trade-offs
-7. Parent-child retrieval
-8. Metadata filtering
-9. Query rewriting
-10. Multi-query retrieval
-11. Query decomposition
-12. Context compression
-13. Lost-in-the-middle problem
+1. Keyword/BM25 search — COMPLETED
+2. Dense/vector search vs sparse/keyword search — VALIDATED
+3. Hybrid search — COMPLETED
+4. Fixed-size chunking — NEXT
+5. Semantic chunking — NEXT
+6. Chunk overlap and chunk-size trade-offs — NEXT
+7. Parent-child retrieval — NEXT
+8. Metadata filtering — NEXT
+9. Query rewriting — NEXT
+10. Multi-query retrieval — NEXT
+11. Query decomposition — NEXT
+12. Context compression — NEXT
+13. Lost-in-the-middle problem — NEXT
 
 Principle:
 
@@ -430,8 +430,18 @@ A concise implementation checklist:
 - Persistent Conversation Memory — COMPLETED
 - Database-backed conversation history — COMPLETED
 - Conversation persistence across API restart — COMPLETED
-- BM25 — NEXT
-- Hybrid search — NEXT
+- BM25 sparse retrieval — COMPLETED
+- SQLite FTS5 indexing — COMPLETED
+- BM25 API — COMPLETED
+- BM25 testing/debugging — COMPLETED
+- Hybrid search implementation — COMPLETED
+- Dense + sparse candidate fusion — COMPLETED
+- Hybrid reranking — COMPLETED
+- Hybrid search endpoint — COMPLETED
+- Hybrid search validation — COMPLETED
+- Better BM25 natural-language query handling — CURRENT IMPROVEMENT
+- Retrieval-quality improvements — NEXT
+- Retrieval evaluation — NEXT
 - Persistent semantic/long-term memory — PLANNED
 - Conversation summarization — PLANNED
 - Advanced RAG — PLANNED
@@ -532,9 +542,9 @@ Example questions:
 
 # Current Next Step
 
-Retrieval Engineering — BM25 and Hybrid Search
+Retrieval Engineering — BM25 and Hybrid Search are implemented and validated
 
-We currently rely primarily on dense/vector retrieval. The next milestone is to understand sparse keyword retrieval using BM25 and then combine dense + sparse retrieval into hybrid search.
+The project now includes working sparse BM25 retrieval and hybrid candidate fusion with reranking. The current focus is improving natural-language query handling for BM25 and continuing retrieval-quality work before moving further into more advanced RAG and evaluation work.
 
 ```text
 Dense Retrieval
@@ -545,10 +555,15 @@ Hybrid Retrieval
       ↓
 Reranking
       ↓
-High-quality enterprise retrieval
+High-quality retrieval
 ```
 
-This is the next learning step for improving retrieval quality before moving further into more advanced RAG and agent capabilities.
+Current improvement:
+- Better BM25 natural-language query handling
+
+Next steps:
+- Continue retrieval-quality improvements
+- Retrieval evaluation
 
 ## Current Architecture
 
@@ -1552,10 +1567,70 @@ These are different retrieval mechanisms with different strengths:
 
 The BM25 implementation is therefore a real retrieval layer in its own right, not just a diagnostic pass.
 
-### Current next implementation
+### Hybrid Search — COMPLETED
 
-Hybrid Search is the NEXT implementation:
+The hybrid-search implementation is now in place and validated.
 
-Vector Search + BM25 → candidate fusion → reranking → RAG
+#### Implemented components
 
-This is the next step in the retrieval stack, where dense and sparse signals are combined before the final reranking and grounded generation stages.
+- IHybridSearchService
+- HybridSearchService
+- IHybridReranker
+- HybridRerankerService
+- Vector search integration
+- BM25 search integration
+- Candidate merging and deduplication
+- Vector similarity tracking
+- BM25 score tracking
+- Hybrid final scoring
+- Hybrid search API endpoint
+
+Endpoint:
+
+- POST /api/chat/hybrid-search
+
+#### Validation and debugging findings
+
+1. Query: annual leave
+
+The Annual Leave Policy document was returned with:
+- Vector match = true
+- BM25 match = true
+
+This confirmed that both dense and sparse retrieval can contribute to the same candidate.
+
+2. Query: How many vacation days does a full-time employee receive?
+
+The Annual Leave Policy document was correctly returned by vector search.
+
+The result showed:
+- Vector match = true
+- BM25 match = false
+
+This demonstrated that vector retrieval can recover semantically related content even when the user's terminology differs from the document terminology.
+
+During testing, the natural-language query initially caused:
+
+SQLite Error 1:
+fts5: syntax error near "?"
+
+The cause was that natural-language punctuation was being passed directly into the FTS5 query parser.
+
+We fixed this by improving NormalizeFtsQuery() so that the query:
+- extracts alphanumeric tokens
+- removes punctuation
+- normalizes tokens
+- safely quotes tokens before passing them to FTS5
+
+After the fix, the same natural-language hybrid-search request completed successfully without the FTS5 syntax error.
+
+This is not a failure of hybrid search. For the semantic vacation-days question, BM25 did not return a candidate while vector search did. That remains a known BM25 natural-language query handling limitation and an improvement area.
+
+### Current improvement and next steps
+
+Current improvement:
+- Better BM25 natural-language query handling
+
+Next steps:
+- Continue retrieval-quality improvements
+- Retrieval evaluation

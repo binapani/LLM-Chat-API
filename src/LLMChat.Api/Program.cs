@@ -37,6 +37,8 @@ builder.Services.AddSingleton<IDocumentChunker, DocumentChunker>();
 builder.Services.AddScoped<IRAGService, RAGService>();
 builder.Services.AddScoped<IRelevanceService, RelevanceService>();
 builder.Services.AddScoped<IReranker, HybridReranker>();
+builder.Services.AddScoped<IHybridReranker, HybridRerankerService>();
+builder.Services.AddScoped<IHybridSearchService, HybridSearchService>();
 builder.Services.AddScoped<IRAGEvaluationService, RAGEvaluationService>();
 builder.Services.AddScoped<PlainTextDocumentExtractor>();
 builder.Services.AddScoped<PdfDocumentTextExtractor>();

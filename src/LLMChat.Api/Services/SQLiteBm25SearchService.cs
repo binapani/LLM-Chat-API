@@ -220,26 +220,25 @@ public class SQLiteBm25SearchService : IBm25SearchService
     }
 
     private static string NormalizeFtsQuery(string query)
+{
+    if (string.IsNullOrWhiteSpace(query))
     {
-        var normalized = Regex.Replace(query.Trim(), @"\s+", " ");
-
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            return string.Empty;
-        }
-
-        normalized = normalized.Replace('-', ' ');
-        normalized = Regex.Replace(normalized, @"\s+", " ");
-
-        if (normalized.Contains('"'))
-        {
-            return normalized;
-        }
-
-        var tokens = normalized
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(token => !string.IsNullOrWhiteSpace(token));
-
-        return string.Join(" ", tokens);
+        return string.Empty;
     }
+
+    var tokens = Regex
+        .Matches(query.ToLowerInvariant(), @"[a-z0-9]+")
+        .Select(match => match.Value)
+        .Where(token => !string.IsNullOrWhiteSpace(token))
+        .ToList();
+
+    if (tokens.Count == 0)
+    {
+        return string.Empty;
+    }
+
+    return string.Join(
+        " ",
+        tokens.Select(token => $"\"{token.Replace("\"", "\"\"")}\""));
+}
 }

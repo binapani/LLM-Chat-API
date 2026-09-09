@@ -13,6 +13,7 @@ public class ChatController : ControllerBase
     private readonly IEmbeddingService _embeddingService;
     private readonly IDocumentIngestionService _documentIngestionService;
     private readonly IVectorStore _vectorStore;
+    private readonly IHybridSearchService _hybridSearchService;
     private readonly IRAGService _ragService;
     private readonly IRAGEvaluationService _ragEvaluationService;
 
@@ -22,6 +23,7 @@ public class ChatController : ControllerBase
         IEmbeddingService embeddingService,
         IDocumentIngestionService documentIngestionService,
         IVectorStore vectorStore,
+        IHybridSearchService hybridSearchService,
         IRAGService ragService,
         IRAGEvaluationService ragEvaluationService)
     {
@@ -30,6 +32,7 @@ public class ChatController : ControllerBase
         _embeddingService = embeddingService;
         _documentIngestionService = documentIngestionService;
         _vectorStore = vectorStore;
+        _hybridSearchService = hybridSearchService;
         _ragService = ragService;
         _ragEvaluationService = ragEvaluationService;
     }
@@ -81,6 +84,34 @@ public async Task<IActionResult> IngestDocuments()
     {
         var queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(request.Message);
         var results = await _vectorStore.SearchAsync(queryEmbedding, 2);
+
+        return Ok(results);
+    }
+
+    [HttpPost("hybrid-search")]
+    public async Task<ActionResult<IReadOnlyList<HybridSearchResult>>> HybridSearch(
+        [FromBody] Bm25SearchRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Query))
+        {
+            return BadRequest("Query is required.");
+        }
+
+        if (request.TopK <= 0)
+        {
+            return BadRequest("topK must be greater than 0.");
+        }
+
+        var results = await _hybridSearchService.SearchAsync(
+            request.Query,
+            request.TopK,
+            cancellationToken);
 
         return Ok(results);
     }
