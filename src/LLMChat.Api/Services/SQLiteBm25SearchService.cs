@@ -226,10 +226,22 @@ public class SQLiteBm25SearchService : IBm25SearchService
         return string.Empty;
     }
 
+    var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "a", "an", "the",
+        "how", "what", "when", "where", "who", "why",
+        "is", "are", "was", "were", "do", "does", "did",
+        "of", "to", "for", "in", "on", "at", "by",
+        "and", "or",
+        "can", "could", "would", "should",
+        "i", "we", "you", "they"
+    };
+
     var tokens = Regex
         .Matches(query.ToLowerInvariant(), @"[a-z0-9]+")
         .Select(match => match.Value)
-        .Where(token => !string.IsNullOrWhiteSpace(token))
+        .Where(token => !stopWords.Contains(token))
+        .Distinct()
         .ToList();
 
     if (tokens.Count == 0)
@@ -238,7 +250,7 @@ public class SQLiteBm25SearchService : IBm25SearchService
     }
 
     return string.Join(
-        " ",
+        " OR ",
         tokens.Select(token => $"\"{token.Replace("\"", "\"\"")}\""));
 }
 }
